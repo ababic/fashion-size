@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "brand_name": "Only The Blind",
+  "charts": [
+    {
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "male",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.onlytheblind.com/en-us/pages/size-chart",
+      "source_notes": "Mens footwear table; tops use alpha cm guides only.",
+      "rows": [
+        {
+          "uk": 7,
+          "eu": 40.5,
+          "us": 8,
+          "au": 7
+        },
+        {
+          "uk": 8,
+          "eu": 42,
+          "us": 9,
+          "au": 8
+        },
+        {
+          "uk": 9,
+          "eu": 43,
+          "us": 10,
+          "au": 9
+        },
+        {
+          "uk": 10,
+          "eu": 44.5,
+          "us": 11,
+          "au": 10
+        },
+        {
+          "uk": 11,
+          "eu": 46,
+          "us": 12,
+          "au": 11
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "brand_name": "Salt-Water Sandals",
+  "charts": [
+    {
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.salt-watersandals.co.uk/products/original-red-womens-sandal",
+      "source_notes": "Salt-Water Original flat-sole women's chart; AU matches US women's sizing per brand.",
+      "rows": [
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 6,
+          "au": 6
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 10,
+          "au": 10
+        },
+        {
+          "uk": 8,
+          "eu": 41,
+          "us": 11,
+          "au": 11
+        }
+      ]
+    },
+    {
+      "kind": "kids-shoe",
+      "age_group": "child",
+      "gender": "",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.salt-watersandals.co.uk/products/original-white-kids-sandal",
+      "source_notes": "Salt-Water Original kids/youth chart; EU from official table (midpoint when a range is shown). AU follows UK.",
+      "rows": [
+        {
+          "uk": 5,
+          "eu": 22,
+          "us": 6,
+          "au": 5
+        },
+        {
+          "uk": 6,
+          "eu": 23,
+          "us": 7,
+          "au": 6
+        },
+        {
+          "uk": 7,
+          "eu": 24,
+          "us": 8,
+          "au": 7
+        },
+        {
+          "uk": 8,
+          "eu": 25,
+          "us": 9,
+          "au": 8
+        },
+        {
+          "uk": 9,
+          "eu": 26,
+          "us": 10,
+          "au": 9
+        },
+        {
+          "uk": 10,
+          "eu": 28,
+          "us": 11,
+          "au": 10
+        },
+        {
+          "uk": 11,
+          "eu": 29,
+          "us": 12,
+          "au": 11
+        },
+        {
+          "uk": 12,
+          "eu": 30,
+          "us": 13,
+          "au": 12
+        },
+        {
+          "uk": 13,
+          "eu": 32,
+          "us": 1,
+          "au": 13
+        },
+        {
+          "uk": 1,
+          "eu": 33,
+          "us": 2,
+          "au": 1
+        },
+        {
+          "uk": 2,
+          "eu": 34,
+          "us": 3,
+          "au": 2
+        },
+        {
+          "uk": 2.5,
+          "eu": 35,
+          "us": 5,
+          "au": 2.5
+        }
+      ]
+    }
+  ]
+}
