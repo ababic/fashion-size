@@ -94,7 +94,7 @@ jobs:
           assert SUPPORTED_BRANDS
           charts = load_brand_charts()
           assert charts
-          chart = chart_for("Dune London", "adult-shoe", "adult", "female", guide="shoes")
+          chart = chart_for("Dune London", "adult-shoe", "adult", "female", product_type="shoes")
           assert chart is not None and chart.rows
           print(f"fashion-size {__version__}: {len(charts)} brand charts")
           PY

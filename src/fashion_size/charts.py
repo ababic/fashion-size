@@ -18,30 +18,30 @@ from typing import Any
 
 from fashion_size.brands import BRANDS, OverrideChart
 from fashion_size.demographics import AgeGroup, Gender
-from fashion_size.guides import OVERRIDE_GUIDE_SLUGS
-from fashion_size.kinds import KindSlug
+from fashion_size.product_types import PRODUCT_TYPE_SLUGS
+from fashion_size.size_types import SizeTypeSlug
 
 
 @dataclass(frozen=True, slots=True)
 class BrandConversionChart:
-    """One brand chart for a kind, age group, gender, and set of guides."""
+    """One brand chart for a size type, age group, gender, and set of product types."""
 
     brand_name: str
-    kind: str
+    size_type: str
     age_group: str
     gender: str
-    guides: tuple[str, ...]
+    product_types: tuple[str, ...]
     updated_at: datetime
     source_url: str
     source_notes: str
     rows: tuple[dict[str, float | int | str], ...]
 
-    def covers(self, guide: str) -> bool:
-        """Whether this chart replaces the default for ``guide``.
+    def covers(self, product_type: str) -> bool:
+        """Whether this chart replaces the default for ``product_type``.
 
-        A chart with no guides covers every family.
+        A chart with no product types covers every product type.
         """
-        return not self.guides or guide in self.guides
+        return not self.product_types or product_type in self.product_types
 
 
 def _chart_directory() -> Path:
@@ -59,15 +59,19 @@ def _validate_override(brand_name: str, chart: OverrideChart) -> None:
         raise ValueError(
             f"Chart id {chart.id!r} on {brand_name!r} must be a lowercase UUID."
         )
-    if chart.kind not in KindSlug:
-        raise ValueError(f"Unknown measurement kind {chart.kind!r} on {brand_name!r}.")
+    if chart.size_type not in SizeTypeSlug:
+        raise ValueError(f"Unknown size type {chart.size_type!r} on {brand_name!r}.")
     if chart.age_group not in AgeGroup:
         raise ValueError(f"Unknown age group {chart.age_group!r} on {brand_name!r}.")
     if chart.gender not in {"", Gender.MALE, Gender.FEMALE}:
         raise ValueError(f"Unknown chart gender {chart.gender!r} on {brand_name!r}.")
-    unknown = [guide for guide in chart.guides if guide not in OVERRIDE_GUIDE_SLUGS]
+    unknown = [
+        product_type
+        for product_type in chart.product_types
+        if product_type not in PRODUCT_TYPE_SLUGS
+    ]
     if unknown:
-        raise ValueError(f"Unknown override guides {unknown!r} on {brand_name!r}.")
+        raise ValueError(f"Unknown product types {unknown!r} on {brand_name!r}.")
     if chart.updated_at.tzinfo is None:
         raise ValueError(
             f"Review date for {brand_name!r} chart {chart.id} must include a timezone."
@@ -133,8 +137,8 @@ def _read_chart_file(path: Path) -> _StoredChart:
 def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
     """``(brand name, charts)`` for every brand in the catalog.
 
-    Names stay in catalog order. A brand whose guide matches the defaults has
-    an empty chart tuple. Each override's rows and source are loaded from its
+    Names stay in catalog order. A brand whose published guide matches the defaults
+    has an empty chart tuple. Each override's rows and source are loaded from its
     UUID file.
     """
     files = {path.stem: path for path in _chart_directory().glob("*.json")}
@@ -157,10 +161,10 @@ def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
             parsed.append(
                 BrandConversionChart(
                     brand_name=brand.name,
-                    kind=override.kind,
+                    size_type=override.size_type,
                     age_group=override.age_group,
                     gender=override.gender,
-                    guides=override.guides,
+                    product_types=override.product_types,
                     updated_at=override.updated_at,
                     source_url=stored.source_url,
                     source_notes=stored.source_notes,
@@ -197,32 +201,34 @@ def charts_for_brand(brand_name: str) -> tuple[BrandConversionChart, ...]:
 
 def chart_for(
     brand_name: str,
-    kind: str,
+    size_type: str,
     age_group: str,
     gender: str,
-    guide: str | None = None,
+    product_type: str | None = None,
 ) -> BrandConversionChart | None:
-    """Pick a brand chart for this kind, demographic, and optional guide.
+    """Pick a brand chart for this size type, demographic, and optional product type.
 
-    A chart that lists ``guide`` wins over a chart with no guides (one chart for
-    every family). When ``guide`` is omitted, a chart for that kind and
-    demographic is returned only when there is exactly one. A male or female
-    chart wins over a chart with a blank gender (the shared chart for that age
-    group).
+    A chart that lists ``product_type`` wins over a chart with no product types
+    (one chart for every product type). When ``product_type`` is omitted, a chart
+    for that size type and demographic is returned only when there is exactly one.
+    A male or female chart wins over a chart with a blank gender (the shared chart
+    for that age group).
     """
     age = age_group.strip().lower()
     sex = gender.strip().lower()
-    kind_slug = kind.strip().lower()
+    size_type_slug = size_type.strip().lower()
     candidates = [
         chart
         for chart in charts_for_brand(brand_name)
-        if chart.kind == kind_slug
+        if chart.size_type == size_type_slug
         and chart.age_group == age
         and chart.gender in {sex, ""}
     ]
-    if guide:
-        explicit = [chart for chart in candidates if guide in chart.guides]
-        pool = explicit or [chart for chart in candidates if not chart.guides]
+    if product_type:
+        explicit = [
+            chart for chart in candidates if product_type in chart.product_types
+        ]
+        pool = explicit or [chart for chart in candidates if not chart.product_types]
         gendered = [chart for chart in pool if chart.gender == sex]
         candidates = gendered or pool
     elif sex:

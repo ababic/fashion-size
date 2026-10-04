@@ -37,8 +37,8 @@ from fashion_size.types import (
     ConversionScale,
     LetterSizeRow,
     LocaleSizeRow,
-    MeasurementKind,
     MissingScaleError,
+    SizeType,
     chart_genders,
     format_age_gender,
     resolve_age_gender,
@@ -48,13 +48,13 @@ _Number = int | float
 
 
 def _scale(
-    kind: MeasurementKind,
+    size_type: SizeType,
     age_group: str,
     gender: str,
     rows: tuple[tuple[_Number, _Number, _Number, _Number], ...],
 ) -> ConversionScale:
     return ConversionScale(
-        kind=kind,
+        size_type=size_type,
         age_group=age_group,
         gender=gender,
         rows=tuple(LocaleSizeRow.from_numbers(*row) for row in rows),
@@ -166,7 +166,7 @@ _MEN_SHOE_ROWS: tuple[tuple[_Number, _Number, _Number, _Number], ...] = (
     (13, 48, 14, 13),
 )
 
-# Kids shoes (UK 6–13 then youth 1–5.5). Separate from baby and adult kinds.
+# Kids shoes (UK 6–13 then youth 1–5.5). Separate from baby and adult size types.
 # AU = UK (Australian children's shoes use UK numbers), US = UK + 1. UK → EU follows
 # the Clarks kids chart; UK 2.5–5.5 match the adult chart for the same UK size.
 _KIDS_SHOE_ROWS: tuple[tuple[_Number, _Number, _Number, _Number], ...] = (
@@ -246,13 +246,13 @@ _CUP_SIZE_ROWS: tuple[tuple[str, str, str, str], ...] = (
 
 
 def _letter_scale(
-    kind: MeasurementKind,
+    size_type: SizeType,
     age_group: str,
     gender: str,
     rows: tuple[tuple[str, str, str, str], ...],
 ) -> ConversionScale:
     return ConversionScale(
-        kind=kind,
+        size_type=size_type,
         age_group=age_group,
         gender=gender,
         rows=tuple(LetterSizeRow.from_tokens(*row) for row in rows),
@@ -260,19 +260,25 @@ def _letter_scale(
 
 
 def _letter_charts(
-    kind: MeasurementKind,
+    size_type: SizeType,
     pairs: tuple[tuple[str, str], ...],
     rows: tuple[tuple[str, str, str, str], ...],
 ) -> dict[tuple[str, str, str], ConversionScale]:
-    return {(kind.slug, age, sex): _letter_scale(kind, age, sex, rows) for age, sex in pairs}
+    return {
+        (size_type.slug, age, sex): _letter_scale(size_type, age, sex, rows)
+        for age, sex in pairs
+    }
 
 
 def _charts(
-    kind: MeasurementKind,
+    size_type: SizeType,
     pairs: tuple[tuple[str, str], ...],
     rows: tuple[tuple[_Number, _Number, _Number, _Number], ...],
 ) -> dict[tuple[str, str, str], ConversionScale]:
-    return {(kind.slug, age, sex): _scale(kind, age, sex, rows) for age, sex in pairs}
+    return {
+        (size_type.slug, age, sex): _scale(size_type, age, sex, rows)
+        for age, sex in pairs
+    }
 
 
 _ADULT_FEMALE = (AgeGroup.ADULT, Gender.FEMALE)
@@ -302,18 +308,22 @@ DEFAULT_SCALES: dict[tuple[str, str, str], ConversionScale] = {
 }
 
 
-def default_scale(kind: MeasurementKind, age_group: AgeGroup | str, gender: Gender | str) -> ConversionScale:
-    """Return the hardcoded chart for this kind and age-group × gender pair.
+def default_scale(
+    size_type: SizeType, age_group: AgeGroup | str, gender: Gender | str
+) -> ConversionScale:
+    """Return the hardcoded chart for this size type and age-group × gender pair.
 
     Unisex products use the male chart. Children and babies fall back to the
     shared chart for that age group when there is no boys or girls chart.
     """
     age, sex = resolve_age_gender(age_group, gender)
     for candidate in chart_genders(age, sex):
-        scale = DEFAULT_SCALES.get((kind.slug, age, candidate))
+        scale = DEFAULT_SCALES.get((size_type.slug, age, candidate))
         if scale is not None:
             return scale
-    tried = " or ".join(format_age_gender(age, candidate) for candidate in chart_genders(age, sex))
+    tried = " or ".join(
+        format_age_gender(age, candidate) for candidate in chart_genders(age, sex)
+    )
     raise MissingScaleError(
-        f"No default {kind.label} conversion chart for {tried}. Pass a brand-specific ConversionScale."
+        f"No default {size_type.label} conversion chart for {tried}. Pass a brand-specific ConversionScale."
     )
