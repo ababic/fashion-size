@@ -1,0 +1,25 @@
+target-version = "py312"
+
+[lint]
+# Explicit list so a newer Ruff default set does not restyle the library.
+select = [
+    "B",
+    "C4",
+    "E",
+    "F",
+    "I",
+    "PIE",
+    "PGH",
+    "SIM",
+    "W",
+    "UP",
+    "RUF100",
+]
+ignore = ["E501"]
+fixable = ["C4", "E", "F", "I", "UP"]
+
+[lint.isort]
+known-first-party = ["fashion_size"]
+
+[format]
+docstring-code-format = true

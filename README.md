@@ -2,11 +2,17 @@
 
 Kind-specific fashion measurements (UK dress size, EU adult shoe size, chest in centimetres) and the charts that convert them. Clothing and footwear share this library.
 
+```bash
+pip install fashion-size
+```
+
+Requires Python 3.12 or newer. There are no runtime dependencies.
+
 Default UK / EU / US / AU charts are in Python. Brand charts that differ from those defaults ship as JSON, with the date they were last checked, the source page, and notes.
 
 This package does not depend on Django. Django model fields are in [`django-fashion-size`](https://github.com/ababic/django-fashion-size).
 
-The source repository is [github.com/ababic/fashion-size](https://github.com/ababic/fashion-size). PyPI packaging comes later.
+The source repository is [github.com/ababic/fashion-size](https://github.com/ababic/fashion-size).
 
 ## Brand charts
 
@@ -33,4 +39,29 @@ value = MeasurementValue.from_raw("10", UK_DRESS_SIZE)
 value.convert("eu", age_group="adult", gender="female")
 ```
 
+French dress, shoe, cup, and chest labels are the EU measurement (`"fr"` converts to that EU value). French band size is the EU centimetre label plus 15. French waist size is not on the chart. Lengths convert between centimetres and inches (`1 in = 2.54 cm`) for values from 5 to 150 inches. Display rounding (nearest centimetre, nearest half inch) does not change the stored value.
+
 Display language defaults to `en-gb`. A host application can register its own getter (Django's `get_language`, for example) with `fashion_size.register_display_language`. Brand-specific conversion is supplied the same way, via `fashion_size.register_brand_converter`.
+
+## Development
+
+```bash
+pip install -e ".[testing,development]"
+pytest
+ruff check src tests
+```
+
+## Releasing
+
+Publishing uses [PyPI trusted publishing](https://docs.pypi.org/trusted-publishers/). On PyPI, add a pending publisher for the `fashion-size` project:
+
+- Owner: `ababic`
+- Repository: `fashion-size`
+- Workflow: `release.yml`
+- Environment: `pypi`
+
+Create a GitHub environment named `pypi` (no secrets). Tag `v0.1.0` — the tag must match `fashion_size.__version__` — to test, build the distributions, attach them to a GitHub release, and publish to PyPI.
+
+## License
+
+BSD 3-Clause. See [LICENSE](https://github.com/ababic/fashion-size/blob/main/LICENSE).
