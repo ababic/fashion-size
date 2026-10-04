@@ -1,12 +1,14 @@
-"""Brand conversion charts shipped as JSON.
+"""Brand conversion charts shipped as JSON, one file per brand.
 
 Each chart records when it was last checked, where it came from, and which
-override guides it replaces. Rows are ``{uk, eu, us, au}``.
+override guides it replaces. Rows are ``{uk, eu, us, au}``. A file with no
+charts means that brand's published guide matches the default charts.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cache
@@ -96,20 +98,77 @@ def _parse_chart(entry: dict[str, Any]) -> BrandConversionChart:
     )
 
 
-@cache
-def load_brand_charts() -> tuple[BrandConversionChart, ...]:
-    """Every shipped brand chart, in fixture order.
+def brand_fixture_stem(brand_name: str) -> str:
+    """File stem for a brand, such as ``marks-and-spencer`` or ``e-l-v-denim``."""
+    text = brand_name.casefold().replace("'", "").replace("\u2019", "").replace("&", " and ")
+    stem = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+    if not stem:
+        raise ValueError(f"Cannot name a file for brand {brand_name!r}.")
+    return stem
 
-    The fixture's ``schema_version`` must be ``1``.
-    """
-    fixture = Path(__file__).resolve().parent / "fixtures" / "brand_conversion_charts.json"
-    payload = json.loads(fixture.read_text(encoding="utf-8"))
+
+def _brand_fixture_directory() -> Path:
+    return Path(__file__).resolve().parent / "fixtures" / "brands"
+
+
+def _parse_brand_file(path: Path) -> tuple[str, tuple[BrandConversionChart, ...]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path.name} is not a brand chart file.")
     if payload.get("schema_version") != 1:
-        raise ValueError(f"Unsupported brand chart schema {payload.get('schema_version')!r}.")
+        raise ValueError(f"Unsupported brand chart schema {payload.get('schema_version')!r} in {path.name}.")
+    brand_name = str(payload.get("brand_name") or "").strip()
+    if not brand_name:
+        raise ValueError(f"{path.name} is missing brand_name.")
+    expected = brand_fixture_stem(brand_name)
+    if path.stem != expected:
+        raise ValueError(f"{path.name} should be named {expected}.json for {brand_name!r}.")
     charts = payload.get("charts")
-    if not isinstance(charts, list) or not charts:
-        raise ValueError("Brand chart fixture has no charts.")
-    return tuple(_parse_chart(entry) for entry in charts)
+    if not isinstance(charts, list):
+        raise ValueError(f"{brand_name!r} is missing a charts list.")
+    parsed: list[BrandConversionChart] = []
+    for entry in charts:
+        if not isinstance(entry, dict):
+            raise ValueError(f"{brand_name!r} chart entries must be objects.")
+        stated = entry.get("brand_name")
+        if stated is not None and str(stated).strip() != brand_name:
+            raise ValueError(f"{path.name} contains a chart for {stated!r}, not {brand_name!r}.")
+        parsed.append(_parse_chart({**entry, "brand_name": brand_name}))
+    return brand_name, tuple(parsed)
+
+
+@cache
+def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
+    """``(brand name, charts)`` for every shipped brand file.
+
+    Names are in case-insensitive alphabetical order. A brand whose guide
+    matches the defaults has an empty chart tuple.
+    """
+    paths = sorted(_brand_fixture_directory().glob("*.json"))
+    if not paths:
+        raise ValueError("No brand files are shipped.")
+    loaded = [_parse_brand_file(path) for path in paths]
+    folded = [name.casefold() for name, _ in loaded]
+    if len(folded) != len(set(folded)):
+        raise ValueError("Two brand files use the same brand name.")
+    loaded.sort(key=lambda item: item[0].casefold())
+    if not any(charts for _, charts in loaded):
+        raise ValueError("Brand files have no charts.")
+    return tuple(loaded)
+
+
+def supported_brand_names() -> tuple[str, ...]:
+    """Brand names this package can convert, in case-insensitive alphabetical order."""
+    return tuple(name for name, _ in _load_brands())
+
+
+def load_brand_charts() -> tuple[BrandConversionChart, ...]:
+    """Every shipped override chart.
+
+    Brands are in case-insensitive alphabetical order, and each brand's charts
+    stay in file order. Brands that match the default charts are omitted.
+    """
+    return tuple(chart for _, charts in _load_brands() for chart in charts)
 
 
 def charts_for_brand(brand_name: str) -> tuple[BrandConversionChart, ...]:

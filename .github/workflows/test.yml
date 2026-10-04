@@ -86,7 +86,8 @@ jobs:
 
           root = pathlib.Path(fashion_size.__file__).resolve().parent
           assert (root / "py.typed").is_file()
-          assert (root / "fixtures" / "brand_conversion_charts.json").is_file()
+          assert (root / "fixtures" / "brands" / "dune-london.json").is_file()
+          assert (root / "fixtures" / "brands" / "marks-and-spencer.json").is_file()
           assert __version__
           assert SUPPORTED_BRANDS
           charts = load_brand_charts()

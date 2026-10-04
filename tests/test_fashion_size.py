@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
+import fashion_size.charts as charts
 from fashion_size import (
     SUPPORTED_BRANDS,
     OverrideGuide,
@@ -16,7 +19,9 @@ from fashion_size import (
 )
 from fashion_size.charts import (
     BrandConversionChart,
+    _parse_brand_file,
     _parse_chart,
+    brand_fixture_stem,
     chart_for,
     charts_for_brand,
     load_brand_charts,
@@ -326,3 +331,57 @@ def _chart_entry(**overrides):
 def test_chart_fixture_rows_are_rejected_when_incomplete(overrides, match):
     with pytest.raises(ValueError, match=match):
         _parse_chart(_chart_entry(**overrides))
+
+
+@pytest.mark.parametrize(
+    ("name", "stem"),
+    [
+        ("Dune London", "dune-london"),
+        ("E.L.V. Denim", "e-l-v-denim"),
+        ("Marks & Spencer", "marks-and-spencer"),
+        ("Nobody's Child", "nobodys-child"),
+        ("Salt-Water Sandals", "salt-water-sandals"),
+    ],
+)
+def test_brand_files_are_named_from_the_brand(name, stem):
+    assert brand_fixture_stem(name) == stem
+
+
+def test_every_supported_brand_has_its_own_file():
+    directory = Path(charts.__file__).resolve().parent / "fixtures" / "brands"
+    assert {path.stem for path in directory.glob("*.json")} == {brand_fixture_stem(name) for name in SUPPORTED_BRANDS}
+    assert "Anthropologie" in SUPPORTED_BRANDS
+    assert charts_for_brand("Anthropologie") == ()
+    assert any(chart.brand_name == "Dune London" for chart in load_brand_charts())
+
+
+def test_brand_file_is_rejected_when_the_name_or_schema_is_wrong(tmp_path: Path):
+    mismatch = tmp_path / "wrong.json"
+    mismatch.write_text(
+        json.dumps({"schema_version": 1, "brand_name": "Dune London", "charts": []}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="dune-london.json"):
+        _parse_brand_file(mismatch)
+
+    bad_schema = tmp_path / "dune-london.json"
+    bad_schema.write_text(
+        json.dumps({"schema_version": 2, "brand_name": "Dune London", "charts": []}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="schema"):
+        _parse_brand_file(bad_schema)
+
+    other_brand = tmp_path / "dune-london.json"
+    other_brand.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "brand_name": "Dune London",
+                "charts": [{"brand_name": "Other"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Other"):
+        _parse_brand_file(other_brand)

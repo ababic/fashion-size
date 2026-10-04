@@ -56,10 +56,6 @@ path = "src/fashion_size/__version__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/fashion_size"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"src/fashion_size/fixtures/brand_conversion_charts.json" = "fashion_size/fixtures/brand_conversion_charts.json"
-"src/fashion_size/py.typed" = "fashion_size/py.typed"
-
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/.github",
