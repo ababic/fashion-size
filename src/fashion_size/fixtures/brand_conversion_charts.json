@@ -1,0 +1,804 @@
+{
+  "schema_version": 1,
+  "description": "Brand charts that differ from the default locale scales. updated_at is when the source was last checked. guides are the override families this chart replaces.",
+  "charts": [
+    {
+      "brand_name": "Dune London",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.dunelondon.com/size-guide",
+      "source_notes": "",
+      "rows": [
+        {
+          "uk": 2,
+          "eu": 35,
+          "us": 4,
+          "au": 4
+        },
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 5,
+          "au": 5
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 6,
+          "au": 6
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 8,
+          "eu": 41,
+          "us": 10,
+          "au": 10
+        },
+        {
+          "uk": 9,
+          "eu": 42,
+          "us": 11,
+          "au": 11
+        }
+      ]
+    },
+    {
+      "brand_name": "Dune London",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "male",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.dunelondon.com/size-guide",
+      "source_notes": "Official chart lists USA/Canada/Australia in one column; AU values match US (not UK) on this guide.",
+      "rows": [
+        {
+          "uk": 6,
+          "eu": 40,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 7,
+          "eu": 41,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 8,
+          "eu": 42,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 9,
+          "eu": 43,
+          "us": 10,
+          "au": 10
+        },
+        {
+          "uk": 10,
+          "eu": 44,
+          "us": 11,
+          "au": 11
+        },
+        {
+          "uk": 11,
+          "eu": 45,
+          "us": 12,
+          "au": 12
+        },
+        {
+          "uk": 12,
+          "eu": 46,
+          "us": 13,
+          "au": 13
+        }
+      ]
+    },
+    {
+      "brand_name": "Urban Outfitters",
+      "kind": "dress",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "trousers",
+        "shirts",
+        "dress-shirts",
+        "suits",
+        "suit-jackets",
+        "dresses",
+        "underwear",
+        "casual-tops",
+        "knitwear",
+        "activewear-tops",
+        "activewear-bottoms"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.urbanoutfitters.com/en-gb/help/size-charts",
+      "source_notes": "UO own-brand women's numeric rows (CM table). Mainline apparel only \u2014 not jeans/denim EU. UK 16 uses US 16 per official guide; UK 18/XL also maps to US 16 on the site but is omitted here because the chart requires unique US column values (same US as UK 16).",
+      "rows": [
+        {
+          "uk": 4,
+          "eu": 32,
+          "us": 0,
+          "au": 4
+        },
+        {
+          "uk": 6,
+          "eu": 34,
+          "us": 2,
+          "au": 6
+        },
+        {
+          "uk": 8,
+          "eu": 36,
+          "us": 4,
+          "au": 8
+        },
+        {
+          "uk": 10,
+          "eu": 38,
+          "us": 6,
+          "au": 10
+        },
+        {
+          "uk": 12,
+          "eu": 40,
+          "us": 8,
+          "au": 12
+        },
+        {
+          "uk": 14,
+          "eu": 42,
+          "us": 10,
+          "au": 14
+        },
+        {
+          "uk": 16,
+          "eu": 44,
+          "us": 16,
+          "au": 16
+        }
+      ]
+    },
+    {
+      "brand_name": "Urban Outfitters",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.urbanoutfitters.com/en-gb/help/size-charts",
+      "source_notes": "UO 'Standard' women's footwear table (not Nike/Vans/Adidas sub-charts).",
+      "rows": [
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 5,
+          "au": 5
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 6,
+          "au": 6
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 8,
+          "eu": 41,
+          "us": 10,
+          "au": 10
+        }
+      ]
+    },
+    {
+      "brand_name": "Urban Outfitters",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "male",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.urbanoutfitters.com/en-gb/help/size-charts",
+      "source_notes": "UO 'Standard' men's footwear table; AU follows UK (chart has no AU column).",
+      "rows": [
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 7,
+          "au": 6
+        },
+        {
+          "uk": 7,
+          "eu": 40.5,
+          "us": 8,
+          "au": 7
+        },
+        {
+          "uk": 8,
+          "eu": 42,
+          "us": 9,
+          "au": 8
+        },
+        {
+          "uk": 9,
+          "eu": 43,
+          "us": 10,
+          "au": 9
+        },
+        {
+          "uk": 10,
+          "eu": 44.5,
+          "us": 11,
+          "au": 10
+        },
+        {
+          "uk": 11,
+          "eu": 46,
+          "us": 12,
+          "au": 11
+        }
+      ]
+    },
+    {
+      "brand_name": "Esska",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://esskashoes.com/pages/esska-size-guide",
+      "source_notes": "EU-primary brand; includes UK 7.5 row.",
+      "rows": [
+        {
+          "uk": 2,
+          "eu": 35,
+          "us": 4,
+          "au": 4
+        },
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 5,
+          "au": 5
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 6,
+          "au": 6
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 7.5,
+          "eu": 41,
+          "us": 9.5,
+          "au": 9.5
+        },
+        {
+          "uk": 8,
+          "eu": 42,
+          "us": 10,
+          "au": 10
+        },
+        {
+          "uk": 9,
+          "eu": 43,
+          "us": 11,
+          "au": 11
+        }
+      ]
+    },
+    {
+      "brand_name": "Salt-Water Sandals",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.salt-watersandals.co.uk/products/original-red-womens-sandal",
+      "source_notes": "Salt-Water Original flat-sole women's chart; AU matches US women's sizing per brand.",
+      "rows": [
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 6,
+          "au": 6
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 10,
+          "au": 10
+        },
+        {
+          "uk": 8,
+          "eu": 41,
+          "us": 11,
+          "au": 11
+        }
+      ]
+    },
+    {
+      "brand_name": "Penelope Chilvers",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://penelopechilvers.com/pages/size-guides",
+      "source_notes": "Footwear conversion with half sizes; AU follows US column.",
+      "rows": [
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 5,
+          "au": 5
+        },
+        {
+          "uk": 3.5,
+          "eu": 36.5,
+          "us": 5.5,
+          "au": 5.5
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 6,
+          "au": 6
+        },
+        {
+          "uk": 4.5,
+          "eu": 37.5,
+          "us": 6.5,
+          "au": 6.5
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 5.5,
+          "eu": 38.5,
+          "us": 7.5,
+          "au": 7.5
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 6.5,
+          "eu": 39.5,
+          "us": 8.5,
+          "au": 8.5
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 7.5,
+          "eu": 40.5,
+          "us": 9.5,
+          "au": 9.5
+        },
+        {
+          "uk": 8,
+          "eu": 41,
+          "us": 10,
+          "au": 10
+        }
+      ]
+    },
+    {
+      "brand_name": "Penelope Chilvers",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "male",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://penelopechilvers.com/pages/clothing-size-guides",
+      "source_notes": "Integer UK men's footwear table on clothing size guide; AU follows UK.",
+      "rows": [
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 5,
+          "au": 3
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 6,
+          "au": 4
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 7,
+          "au": 5
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 8,
+          "au": 6
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 9,
+          "au": 7
+        },
+        {
+          "uk": 8,
+          "eu": 41,
+          "us": 10,
+          "au": 8
+        },
+        {
+          "uk": 9,
+          "eu": 42,
+          "us": 11,
+          "au": 9
+        },
+        {
+          "uk": 10,
+          "eu": 43,
+          "us": 12,
+          "au": 10
+        },
+        {
+          "uk": 11,
+          "eu": 44,
+          "us": 13,
+          "au": 11
+        }
+      ]
+    },
+    {
+      "brand_name": "Mallet",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "male",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://mallet.com/pages/mens-shoes-size-guide",
+      "source_notes": "",
+      "rows": [
+        {
+          "uk": 5,
+          "eu": 39,
+          "us": 6,
+          "au": 5
+        },
+        {
+          "uk": 6,
+          "eu": 40,
+          "us": 7,
+          "au": 6
+        },
+        {
+          "uk": 7,
+          "eu": 41,
+          "us": 8,
+          "au": 7
+        },
+        {
+          "uk": 8,
+          "eu": 42,
+          "us": 9,
+          "au": 8
+        },
+        {
+          "uk": 9,
+          "eu": 43,
+          "us": 10,
+          "au": 9
+        },
+        {
+          "uk": 10,
+          "eu": 44,
+          "us": 11,
+          "au": 10
+        },
+        {
+          "uk": 11,
+          "eu": 45,
+          "us": 12,
+          "au": 11
+        },
+        {
+          "uk": 12,
+          "eu": 46,
+          "us": 13,
+          "au": 12
+        },
+        {
+          "uk": 13,
+          "eu": 47,
+          "us": 14,
+          "au": 13
+        }
+      ]
+    },
+    {
+      "brand_name": "Mallet",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "female",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://mallet.com/pages/womens-shoes-size-guide",
+      "source_notes": "",
+      "rows": [
+        {
+          "uk": 3,
+          "eu": 36,
+          "us": 5,
+          "au": 5
+        },
+        {
+          "uk": 4,
+          "eu": 37,
+          "us": 6,
+          "au": 6
+        },
+        {
+          "uk": 5,
+          "eu": 38,
+          "us": 7,
+          "au": 7
+        },
+        {
+          "uk": 6,
+          "eu": 39,
+          "us": 8,
+          "au": 8
+        },
+        {
+          "uk": 7,
+          "eu": 40,
+          "us": 9,
+          "au": 9
+        },
+        {
+          "uk": 8,
+          "eu": 41,
+          "us": 10,
+          "au": 10
+        }
+      ]
+    },
+    {
+      "brand_name": "Only The Blind",
+      "kind": "adult-shoe",
+      "age_group": "adult",
+      "gender": "male",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.onlytheblind.com/en-us/pages/size-chart",
+      "source_notes": "Mens footwear table; tops use alpha cm guides only.",
+      "rows": [
+        {
+          "uk": 7,
+          "eu": 40.5,
+          "us": 8,
+          "au": 7
+        },
+        {
+          "uk": 8,
+          "eu": 42,
+          "us": 9,
+          "au": 8
+        },
+        {
+          "uk": 9,
+          "eu": 43,
+          "us": 10,
+          "au": 9
+        },
+        {
+          "uk": 10,
+          "eu": 44.5,
+          "us": 11,
+          "au": 10
+        },
+        {
+          "uk": 11,
+          "eu": 46,
+          "us": 12,
+          "au": 11
+        }
+      ]
+    },
+    {
+      "brand_name": "Salt-Water Sandals",
+      "kind": "kids-shoe",
+      "age_group": "child",
+      "gender": "",
+      "guides": [
+        "shoes"
+      ],
+      "updated_at": "2026-03-29T00:00:00Z",
+      "source_url": "https://www.salt-watersandals.co.uk/products/original-white-kids-sandal",
+      "source_notes": "Salt-Water Original kids/youth chart; EU from official table (midpoint when a range is shown). AU follows UK.",
+      "rows": [
+        {
+          "uk": 5,
+          "eu": 22,
+          "us": 6,
+          "au": 5
+        },
+        {
+          "uk": 6,
+          "eu": 23,
+          "us": 7,
+          "au": 6
+        },
+        {
+          "uk": 7,
+          "eu": 24,
+          "us": 8,
+          "au": 7
+        },
+        {
+          "uk": 8,
+          "eu": 25,
+          "us": 9,
+          "au": 8
+        },
+        {
+          "uk": 9,
+          "eu": 26,
+          "us": 10,
+          "au": 9
+        },
+        {
+          "uk": 10,
+          "eu": 28,
+          "us": 11,
+          "au": 10
+        },
+        {
+          "uk": 11,
+          "eu": 29,
+          "us": 12,
+          "au": 11
+        },
+        {
+          "uk": 12,
+          "eu": 30,
+          "us": 13,
+          "au": 12
+        },
+        {
+          "uk": 13,
+          "eu": 32,
+          "us": 1,
+          "au": 13
+        },
+        {
+          "uk": 1,
+          "eu": 33,
+          "us": 2,
+          "au": 1
+        },
+        {
+          "uk": 2,
+          "eu": 34,
+          "us": 3,
+          "au": 2
+        },
+        {
+          "uk": 2.5,
+          "eu": 35,
+          "us": 5,
+          "au": 2.5
+        }
+      ]
+    }
+  ]
+}
