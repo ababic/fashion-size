@@ -1,3 +1,3 @@
 {
-  "install": "python3 -m pip install --user -e ."
+  "install": "python3 -m pip install --user -e \".[testing,development]\"\nsudo ln -sfn \"$HOME/.local/bin/pytest\" /usr/local/bin/pytest\nsudo ln -sfn \"$HOME/.local/bin/ruff\" /usr/local/bin/ruff"
 }
