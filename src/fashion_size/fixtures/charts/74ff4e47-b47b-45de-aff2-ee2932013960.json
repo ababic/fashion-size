@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "source_url": "https://www.dunelondon.com/size-guide",
+  "source_notes": "Official chart lists USA/Canada/Australia in one column; AU values match US (not UK) on this guide.",
+  "rows": [
+    {
+      "uk": 6,
+      "eu": 40,
+      "us": 7,
+      "au": 7
+    },
+    {
+      "uk": 7,
+      "eu": 41,
+      "us": 8,
+      "au": 8
+    },
+    {
+      "uk": 8,
+      "eu": 42,
+      "us": 9,
+      "au": 9
+    },
+    {
+      "uk": 9,
+      "eu": 43,
+      "us": 10,
+      "au": 10
+    },
+    {
+      "uk": 10,
+      "eu": 44,
+      "us": 11,
+      "au": 11
+    },
+    {
+      "uk": 11,
+      "eu": 45,
+      "us": 12,
+      "au": 12
+    },
+    {
+      "uk": 12,
+      "eu": 46,
+      "us": 13,
+      "au": 13
+    }
+  ]
+}

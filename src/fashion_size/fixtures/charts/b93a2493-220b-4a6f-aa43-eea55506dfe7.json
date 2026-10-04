@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "source_url": "https://mallet.com/pages/mens-shoes-size-guide",
+  "source_notes": "",
+  "rows": [
+    {
+      "uk": 5,
+      "eu": 39,
+      "us": 6,
+      "au": 5
+    },
+    {
+      "uk": 6,
+      "eu": 40,
+      "us": 7,
+      "au": 6
+    },
+    {
+      "uk": 7,
+      "eu": 41,
+      "us": 8,
+      "au": 7
+    },
+    {
+      "uk": 8,
+      "eu": 42,
+      "us": 9,
+      "au": 8
+    },
+    {
+      "uk": 9,
+      "eu": 43,
+      "us": 10,
+      "au": 9
+    },
+    {
+      "uk": 10,
+      "eu": 44,
+      "us": 11,
+      "au": 10
+    },
+    {
+      "uk": 11,
+      "eu": 45,
+      "us": 12,
+      "au": 11
+    },
+    {
+      "uk": 12,
+      "eu": 46,
+      "us": 13,
+      "au": 12
+    },
+    {
+      "uk": 13,
+      "eu": 47,
+      "us": 14,
+      "au": 13
+    }
+  ]
+}

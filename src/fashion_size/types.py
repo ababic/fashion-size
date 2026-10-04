@@ -3,7 +3,7 @@
 Each measurement is a concrete entity such as ``UK_DRESS_SIZE`` or
 ``CM_CHEST_SIZE`` — it knows its kind and its locale (``universal`` for
 centimetres and inches). Default conversion charts live in
-``fashion_size.scales``. Brand-specific charts are JSON fixtures — see
+``fashion_size.scales``. Brand-specific charts are JSON files named by id — see
 ``fashion_size.charts``.
 """
 

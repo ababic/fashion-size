@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "source_url": "https://mallet.com/pages/womens-shoes-size-guide",
+  "source_notes": "",
+  "rows": [
+    {
+      "uk": 3,
+      "eu": 36,
+      "us": 5,
+      "au": 5
+    },
+    {
+      "uk": 4,
+      "eu": 37,
+      "us": 6,
+      "au": 6
+    },
+    {
+      "uk": 5,
+      "eu": 38,
+      "us": 7,
+      "au": 7
+    },
+    {
+      "uk": 6,
+      "eu": 39,
+      "us": 8,
+      "au": 8
+    },
+    {
+      "uk": 7,
+      "eu": 40,
+      "us": 9,
+      "au": 9
+    },
+    {
+      "uk": 8,
+      "eu": 41,
+      "us": 10,
+      "au": 10
+    }
+  ]
+}

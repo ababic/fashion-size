@@ -8,7 +8,7 @@ pip install fashion-size
 
 Requires Python 3.12 or newer. There are no runtime dependencies.
 
-Default UK / EU / US / AU charts are in Python. Brand charts that differ from those defaults ship as JSON, with the date they were last checked, the source page, and notes.
+Default UK / EU / US / AU charts are in Python. Brand charts that differ from those defaults ship as JSON: the rows, the source page, and notes live with the chart, and the date it was last checked lives in the brand catalog.
 
 This package does not depend on Django. Django model fields are in [`django-fashion-size`](https://github.com/ababic/django-fashion-size).
 
@@ -29,6 +29,8 @@ chart.rows
 ```
 
 `OverrideGuide` is the list of families a brand chart can cover on its own (jeans, trousers, shoes, boots, and so on). A chart names the families it replaces.
+
+Each override chart is a JSON file named by id under `src/fashion_size/fixtures/charts`. The file holds the rows, the source page, and any notes about that table. Which brand it belongs to, the kind and demographic, and when it was last checked live in `fashion_size.brands`. A brand with no charts there matches the default charts.
 
 ## Conversion
 

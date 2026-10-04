@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "source_url": "https://esskashoes.com/pages/esska-size-guide",
+  "source_notes": "EU-primary brand; includes UK 7.5 row.",
+  "rows": [
+    {
+      "uk": 2,
+      "eu": 35,
+      "us": 4,
+      "au": 4
+    },
+    {
+      "uk": 3,
+      "eu": 36,
+      "us": 5,
+      "au": 5
+    },
+    {
+      "uk": 4,
+      "eu": 37,
+      "us": 6,
+      "au": 6
+    },
+    {
+      "uk": 5,
+      "eu": 38,
+      "us": 7,
+      "au": 7
+    },
+    {
+      "uk": 6,
+      "eu": 39,
+      "us": 8,
+      "au": 8
+    },
+    {
+      "uk": 7,
+      "eu": 40,
+      "us": 9,
+      "au": 9
+    },
+    {
+      "uk": 7.5,
+      "eu": 41,
+      "us": 9.5,
+      "au": 9.5
+    },
+    {
+      "uk": 8,
+      "eu": 42,
+      "us": 10,
+      "au": 10
+    },
+    {
+      "uk": 9,
+      "eu": 43,
+      "us": 11,
+      "au": 11
+    }
+  ]
+}
