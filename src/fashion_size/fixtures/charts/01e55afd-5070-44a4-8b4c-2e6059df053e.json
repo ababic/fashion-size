@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "source_url": "https://www.urbanoutfitters.com/en-gb/help/size-charts",
+  "source_notes": "UO 'Standard' women's footwear table (not Nike/Vans/Adidas sub-charts).",
   "rows": [
     {
       "uk": 3,

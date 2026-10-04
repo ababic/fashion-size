@@ -1,8 +1,9 @@
 """Brands whose size guides this package can convert.
 
 Override charts are JSON files named by id in ``fashion_size/fixtures/charts``.
-A brand with no charts matches the default charts. The id, review date, and
-source for each override live here. Brands with no garment size system
+Each file holds the rows, the source page, and notes about that table. A brand
+with no charts matches the default charts. The id, kind, demographic, guides,
+and review date for each override live here. Brands with no garment size system
 (homeware, made-to-measure, promotional merch) are omitted.
 """
 
@@ -22,8 +23,6 @@ class OverrideChart:
     gender: str
     guides: tuple[str, ...]
     updated_at: datetime
-    source_url: str
-    source_notes: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +54,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.dunelondon.com/size-guide",
             ),
             OverrideChart(
                 id="74ff4e47-b47b-45de-aff2-ee2932013960",
@@ -64,8 +62,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.dunelondon.com/size-guide",
-                source_notes="Official chart lists USA/Canada/Australia in one column; AU values match US (not UK) on this guide.",
             ),
         ),
     ),
@@ -80,8 +76,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://esskashoes.com/pages/esska-size-guide",
-                source_notes="EU-primary brand; includes UK 7.5 row.",
             ),
         ),
     ),
@@ -103,7 +97,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://mallet.com/pages/mens-shoes-size-guide",
             ),
             OverrideChart(
                 id="33541989-d9c8-4395-87ab-2913ed1e4dec",
@@ -112,7 +105,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://mallet.com/pages/womens-shoes-size-guide",
             ),
         ),
     ),
@@ -130,8 +122,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.onlytheblind.com/en-us/pages/size-chart",
-                source_notes="Mens footwear table; tops use alpha cm guides only.",
             ),
         ),
     ),
@@ -147,8 +137,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://penelopechilvers.com/pages/size-guides",
-                source_notes="Footwear conversion with half sizes; AU follows US column.",
             ),
             OverrideChart(
                 id="c8292828-b338-44c8-a91a-8a211da44c03",
@@ -157,8 +145,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://penelopechilvers.com/pages/clothing-size-guides",
-                source_notes="Integer UK men's footwear table on clothing size guide; AU follows UK.",
             ),
         ),
     ),
@@ -177,8 +163,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.salt-watersandals.co.uk/products/original-red-womens-sandal",
-                source_notes="Salt-Water Original flat-sole women's chart; AU matches US women's sizing per brand.",
             ),
             OverrideChart(
                 id="0dd48235-ad6c-40e2-96d7-0dd1c4a47c07",
@@ -187,8 +171,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.salt-watersandals.co.uk/products/original-white-kids-sandal",
-                source_notes="Salt-Water Original kids/youth chart; EU from official table (midpoint when a range is shown). AU follows UK.",
             ),
         ),
     ),
@@ -219,8 +201,6 @@ BRANDS: tuple[Brand, ...] = (
                     "activewear-bottoms",
                 ),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.urbanoutfitters.com/en-gb/help/size-charts",
-                source_notes="UO own-brand women's numeric rows (CM table). Mainline apparel only — not jeans/denim EU. UK 16 uses US 16 per official guide; UK 18/XL also maps to US 16 on the site but is omitted here because the chart requires unique US column values (same US as UK 16).",
             ),
             OverrideChart(
                 id="01e55afd-5070-44a4-8b4c-2e6059df053e",
@@ -229,8 +209,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.urbanoutfitters.com/en-gb/help/size-charts",
-                source_notes="UO 'Standard' women's footwear table (not Nike/Vans/Adidas sub-charts).",
             ),
             OverrideChart(
                 id="1051f93c-48a5-4cd1-a74f-76faa4328a48",
@@ -239,8 +217,6 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 guides=("shoes",),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
-                source_url="https://www.urbanoutfitters.com/en-gb/help/size-charts",
-                source_notes="UO 'Standard' men's footwear table; AU follows UK (chart has no AU column).",
             ),
         ),
     ),

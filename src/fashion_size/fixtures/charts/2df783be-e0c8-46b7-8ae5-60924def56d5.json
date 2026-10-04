@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "source_url": "https://www.urbanoutfitters.com/en-gb/help/size-charts",
+  "source_notes": "UO own-brand women's numeric rows (CM table). Mainline apparel only — not jeans/denim EU. UK 16 uses US 16 per official guide; UK 18/XL also maps to US 16 on the site but is omitted here because the chart requires unique US column values (same US as UK 16).",
   "rows": [
     {
       "uk": 4,

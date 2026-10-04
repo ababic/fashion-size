@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "source_url": "https://www.urbanoutfitters.com/en-gb/help/size-charts",
+  "source_notes": "UO 'Standard' men's footwear table; AU follows UK (chart has no AU column).",
   "rows": [
     {
       "uk": 6,

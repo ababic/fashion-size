@@ -22,7 +22,7 @@ from fashion_size.brands import BRANDS
 from fashion_size.charts import (
     BrandConversionChart,
     _parse_rows,
-    _read_chart_rows,
+    _read_chart_file,
     _validate_override,
     chart_for,
     charts_for_brand,
@@ -72,6 +72,11 @@ def test_readme_brand_chart_example():
     assert chart.updated_at == datetime(2026, 3, 29, tzinfo=UTC)
     assert chart.source_url == "https://www.dunelondon.com/size-guide"
     assert chart.source_notes == ""
+    mens = chart_for(
+        "Dune London", "adult-shoe", "adult", "male", guide=OverrideGuide.SHOES
+    )
+    assert mens is not None
+    assert "AU values match US" in mens.source_notes
     assert {"uk": 7, "eu": 40, "us": 9, "au": 9} in chart.rows
     assert chart.covers(OverrideGuide.SHOES)
     assert not chart.covers(OverrideGuide.JEANS)
@@ -372,6 +377,7 @@ def test_shipped_brand_charts_are_complete():
     for chart in charts:
         assert chart.kind in KindSlug
         assert chart.updated_at.tzinfo is not None
+        assert chart.source_url.startswith("https://")
         assert chart.rows
         guide = chart.guides[0] if chart.guides else None
         gender = chart.gender or "female"
@@ -458,25 +464,51 @@ def test_override_files_match_the_catalog():
     assert any(chart.brand_name == "Dune London" for chart in load_brand_charts())
 
 
-def test_chart_file_must_be_rows_only(tmp_path: Path):
+def test_chart_file_requires_source_and_rows(tmp_path: Path):
     path = tmp_path / f"{_sample_override().id}.json"
-    path.write_text(
-        json.dumps(
-            {"schema_version": 2, "rows": [{"uk": 7, "eu": 40, "us": 9, "au": 9}]}
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(ValueError, match="schema"):
-        _read_chart_rows(path)
+    rows = [{"uk": 7, "eu": 40, "us": 9, "au": 9}]
     path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
-                "brand_name": "Dune London",
-                "rows": [{"uk": 7, "eu": 40, "us": 9, "au": 9}],
+                "schema_version": 2,
+                "source_url": "https://example.com/sizes",
+                "source_notes": "",
+                "rows": rows,
             }
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="only schema_version and rows"):
-        _read_chart_rows(path)
+    with pytest.raises(ValueError, match="schema"):
+        _read_chart_file(path)
+    path.write_text(
+        json.dumps({"schema_version": 1, "rows": rows}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="source_url"):
+        _read_chart_file(path)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_url": "  ",
+                "source_notes": "",
+                "rows": rows,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="source_url"):
+        _read_chart_file(path)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source_url": "https://example.com/sizes",
+                "source_notes": None,
+                "rows": rows,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="source_notes"):
+        _read_chart_file(path)

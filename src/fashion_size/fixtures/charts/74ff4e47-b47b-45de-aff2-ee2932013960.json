@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "source_url": "https://www.dunelondon.com/size-guide",
+  "source_notes": "Official chart lists USA/Canada/Australia in one column; AU values match US (not UK) on this guide.",
   "rows": [
     {
       "uk": 6,

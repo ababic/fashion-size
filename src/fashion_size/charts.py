@@ -1,8 +1,9 @@
 """Brand conversion charts.
 
-Each override chart is a JSON file of rows, named by UUID. Which brand it
-belongs to, when it was last checked, and the source page are recorded on
-``fashion_size.brands.BRANDS``. A brand with no charts matches the defaults.
+Each override chart is a JSON file named by UUID. The file holds the conversion
+rows, the source page, and notes about that table. Which brand it belongs to,
+and when it was last checked, are recorded on ``fashion_size.brands.BRANDS``.
+A brand with no charts matches the defaults.
 """
 
 from __future__ import annotations
@@ -73,6 +74,15 @@ def _validate_override(brand_name: str, chart: OverrideChart) -> None:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class _StoredChart:
+    """Rows and provenance read from one chart file."""
+
+    source_url: str
+    source_notes: str
+    rows: tuple[dict[str, float | int | str], ...]
+
+
 def _parse_rows(
     chart_id: str, rows: object
 ) -> tuple[dict[str, float | int | str], ...]:
@@ -96,13 +106,27 @@ def _parse_rows(
     return tuple(normalised_rows)
 
 
-def _read_chart_rows(path: Path) -> tuple[dict[str, float | int | str], ...]:
+def _read_chart_file(path: Path) -> _StoredChart:
     payload: Any = json.loads(path.read_text(encoding="utf-8"))
+    chart_id = path.stem
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         raise ValueError(f"Unsupported chart schema in {path.name}.")
-    if set(payload) != {"schema_version", "rows"}:
-        raise ValueError(f"{path.name} must contain only schema_version and rows.")
-    return _parse_rows(path.stem, payload["rows"])
+    expected = {"schema_version", "source_url", "source_notes", "rows"}
+    if set(payload) != expected:
+        raise ValueError(
+            f"{path.name} must contain schema_version, source_url, source_notes, and rows."
+        )
+    source_url = payload["source_url"]
+    source_notes = payload["source_notes"]
+    if not isinstance(source_url, str) or not source_url.strip():
+        raise ValueError(f"{chart_id} chart source_url must be a non-empty string.")
+    if not isinstance(source_notes, str):
+        raise ValueError(f"{chart_id} chart source_notes must be a string.")
+    return _StoredChart(
+        source_url=source_url,
+        source_notes=source_notes,
+        rows=_parse_rows(chart_id, payload["rows"]),
+    )
 
 
 @cache
@@ -110,7 +134,8 @@ def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
     """``(brand name, charts)`` for every brand in the catalog.
 
     Names stay in catalog order. A brand whose guide matches the defaults has
-    an empty chart tuple. Each override's rows are loaded from its UUID file.
+    an empty chart tuple. Each override's rows and source are loaded from its
+    UUID file.
     """
     files = {path.stem: path for path in _chart_directory().glob("*.json")}
     names = [brand.name.casefold() for brand in BRANDS]
@@ -128,6 +153,7 @@ def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
             path = files.get(override.id)
             if path is None:
                 raise ValueError(f"No chart file for {override.id} ({brand.name}).")
+            stored = _read_chart_file(path)
             parsed.append(
                 BrandConversionChart(
                     brand_name=brand.name,
@@ -136,9 +162,9 @@ def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
                     gender=override.gender,
                     guides=override.guides,
                     updated_at=override.updated_at,
-                    source_url=override.source_url,
-                    source_notes=override.source_notes,
-                    rows=_read_chart_rows(path),
+                    source_url=stored.source_url,
+                    source_notes=stored.source_notes,
+                    rows=stored.rows,
                 )
             )
         loaded.append((brand.name, tuple(parsed)))
