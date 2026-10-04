@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fashion-size"
 dynamic = ["version"]
-description = "Kind-specific fashion measurements, locale conversion, and brand size charts."
+description = "Size types, locale conversion, and brand size charts."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "BSD-3-Clause"

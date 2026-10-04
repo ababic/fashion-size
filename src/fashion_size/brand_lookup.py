@@ -15,7 +15,7 @@ _brand_converter: BrandConverter | None = None
 
 
 def register_brand_converter(converter: BrandConverter) -> None:
-    """Use ``converter`` when a ``MeasurementValue`` converts for a brand."""
+    """Use ``converter`` when a ``Size`` converts for a brand."""
     global _brand_converter
     _brand_converter = converter
 

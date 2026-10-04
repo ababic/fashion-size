@@ -1,14 +1,14 @@
-"""Measurement kind slugs.
+"""Stored codes for a size type.
 
-These are the string values stored for a measurement kind. The Django choice
+These are the string values stored for a ``SizeType``. The Django choice
 field that uses the same values lives in ``django-fashion-size``.
 """
 
 from enum import StrEnum
 
 
-class KindSlug(StrEnum):
-    """Fine-grained measurement kinds that can be bound to catalog attributes."""
+class SizeTypeSlug(StrEnum):
+    """Fine-grained size types that can be bound to catalog attributes."""
 
     DRESS = "dress"
     ADULT_SHOE = "adult-shoe"
