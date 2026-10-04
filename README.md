@@ -30,7 +30,7 @@ chart.rows
 
 `OverrideGuide` is the list of families a brand chart can cover on its own (jeans, trousers, shoes, boots, and so on). A chart names the families it replaces.
 
-Each brand is a JSON file under `src/fashion_size/fixtures/brands` (`dune-london.json`, `marks-and-spencer.json`). `SUPPORTED_BRANDS` is that directory. A file with no charts means the brand's guide matches the default charts.
+Each override chart is a JSON file of rows named by id under `src/fashion_size/fixtures/charts`. Which brand it belongs to, when it was last checked, and the source page are recorded in `fashion_size.brands`. A brand with no charts there matches the default charts.
 
 ## Conversion
 

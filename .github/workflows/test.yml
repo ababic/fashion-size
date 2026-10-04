@@ -82,12 +82,14 @@ jobs:
 
           import fashion_size
           from fashion_size import SUPPORTED_BRANDS, __version__
+          from fashion_size.brands import BRANDS
           from fashion_size.charts import chart_for, load_brand_charts
 
           root = pathlib.Path(fashion_size.__file__).resolve().parent
           assert (root / "py.typed").is_file()
-          assert (root / "fixtures" / "brands" / "dune-london.json").is_file()
-          assert (root / "fixtures" / "brands" / "marks-and-spencer.json").is_file()
+          chart_ids = [chart.id for brand in BRANDS for chart in brand.charts]
+          assert chart_ids
+          assert all((root / "fixtures" / "charts" / f"{chart_id}.json").is_file() for chart_id in chart_ids)
           assert __version__
           assert SUPPORTED_BRANDS
           charts = load_brand_charts()
