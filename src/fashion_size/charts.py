@@ -13,7 +13,9 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
+from fashion_size.demographics import AgeGroup, Gender
 from fashion_size.guides import OVERRIDE_GUIDE_SLUGS
+from fashion_size.kinds import KindSlug
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,32 +51,64 @@ def _parse_updated_at(value: object) -> datetime:
 
 
 def _parse_chart(entry: dict[str, Any]) -> BrandConversionChart:
+    brand_name = str(entry.get("brand_name") or "").strip()
+    if not brand_name:
+        raise ValueError("Brand chart is missing brand_name.")
+    kind = str(entry.get("kind") or "")
+    if kind not in KindSlug:
+        raise ValueError(f"Unknown measurement kind {kind!r} on {brand_name!r}.")
+    age_group = str(entry.get("age_group") or "")
+    if age_group not in AgeGroup:
+        raise ValueError(f"Unknown age group {age_group!r} on {brand_name!r}.")
+    gender = str(entry.get("gender") or "")
+    if gender not in {"", Gender.MALE, Gender.FEMALE}:
+        raise ValueError(f"Unknown chart gender {gender!r} on {brand_name!r}.")
     guides = tuple(str(guide) for guide in entry.get("guides") or [])
     unknown = [guide for guide in guides if guide not in OVERRIDE_GUIDE_SLUGS]
     if unknown:
-        raise ValueError(f"Unknown override guides {unknown!r} on {entry.get('brand_name')!r}.")
+        raise ValueError(f"Unknown override guides {unknown!r} on {brand_name!r}.")
     rows = entry.get("rows") or []
     if not isinstance(rows, list) or not rows:
-        raise ValueError(f"{entry.get('brand_name')!r} chart has no rows.")
+        raise ValueError(f"{brand_name!r} chart has no rows.")
+    normalised_rows: list[dict[str, float | int | str]] = []
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"uk", "eu", "us", "au"}:
+            raise ValueError(f"{brand_name!r} chart row must have uk, eu, us, and au.")
+        normalised: dict[str, float | int | str] = {}
+        for key in ("uk", "eu", "us", "au"):
+            value = row[key]
+            if isinstance(value, bool) or not isinstance(value, str | int | float):
+                raise ValueError(f"{brand_name!r} chart has an invalid {key} value {value!r}.")
+            if isinstance(value, str) and not value.strip():
+                raise ValueError(f"{brand_name!r} chart has an empty {key} value.")
+            normalised[key] = value
+        normalised_rows.append(normalised)
     return BrandConversionChart(
-        brand_name=str(entry["brand_name"]),
-        kind=str(entry["kind"]),
-        age_group=str(entry["age_group"]),
-        gender=str(entry.get("gender") or ""),
+        brand_name=brand_name,
+        kind=kind,
+        age_group=age_group,
+        gender=gender,
         guides=guides,
         updated_at=_parse_updated_at(entry.get("updated_at")),
         source_url=str(entry.get("source_url") or ""),
         source_notes=str(entry.get("source_notes") or ""),
-        rows=tuple(rows),
+        rows=tuple(normalised_rows),
     )
 
 
 @cache
 def load_brand_charts() -> tuple[BrandConversionChart, ...]:
-    """Every shipped brand chart, in fixture order."""
+    """Every shipped brand chart, in fixture order.
+
+    The fixture's ``schema_version`` must be ``1``.
+    """
     fixture = Path(__file__).resolve().parent / "fixtures" / "brand_conversion_charts.json"
     payload = json.loads(fixture.read_text(encoding="utf-8"))
-    charts = payload.get("charts") or []
+    if payload.get("schema_version") != 1:
+        raise ValueError(f"Unsupported brand chart schema {payload.get('schema_version')!r}.")
+    charts = payload.get("charts")
+    if not isinstance(charts, list) or not charts:
+        raise ValueError("Brand chart fixture has no charts.")
     return tuple(_parse_chart(entry) for entry in charts)
 
 
