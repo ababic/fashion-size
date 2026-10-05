@@ -146,7 +146,7 @@ _WOMEN_SHOE_ROWS: tuple[tuple[_Number, _Number, _Number, _Number], ...] = (
 )
 
 # Men's shoes: AU = UK, US = UK + 1. UK → EU follows Clarks (UK 7 = 41, 8 = 42,
-# 9 = 43, 9.5 = 44, 10 = 44.5, 11 = 46, 12 = 47, 13 = 48).
+# 9 = 43, 9.5 = 44, 10 = 44.5, 11 = 46, 12 = 47, 12.5 = 47.5, 13 = 48).
 _MEN_SHOE_ROWS: tuple[tuple[_Number, _Number, _Number, _Number], ...] = (
     (5, 38, 6, 5),
     (5.5, 38.5, 6.5, 5.5),
@@ -163,6 +163,7 @@ _MEN_SHOE_ROWS: tuple[tuple[_Number, _Number, _Number, _Number], ...] = (
     (11, 46, 12, 11),
     (11.5, 46.5, 12.5, 11.5),
     (12, 47, 13, 12),
+    (12.5, 47.5, 13.5, 12.5),
     (13, 48, 14, 13),
 )
 

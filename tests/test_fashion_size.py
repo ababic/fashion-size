@@ -131,6 +131,10 @@ def test_locale_charts():
     men_shoe = Size.from_raw(7, UK_ADULT_SHOE_SIZE)
     assert men_shoe.convert("us", age_group="adult", gender="male").raw == 8
     assert men_shoe.convert("au", age_group="adult", gender="unisex").raw == 7
+    men_half = Size.from_raw("12.5", UK_ADULT_SHOE_SIZE)
+    assert men_half.convert("eu", age_group="adult", gender="male").raw == Decimal("47.5")
+    assert men_half.convert("us", age_group="adult", gender="male").raw == Decimal("13.5")
+    assert men_half.convert("au", age_group="adult", gender="male").raw == Decimal("12.5")
     assert (
         Size.from_raw(6, UK_KIDS_SHOE_SIZE)
         .convert("eu", age_group="child", gender="male")
@@ -382,6 +386,16 @@ def test_shipped_brand_charts_are_complete():
         product_type=ProductType.SHOES,
     )
     assert kids is not None and kids.gender == ""
+    assert {"uk": 12.5, "eu": 31, "us": 13.5, "au": 12.5} in kids.rows
+    mallet = chart_for(
+        "Mallet",
+        "adult-shoe",
+        "adult",
+        "male",
+        product_type=ProductType.SHOES,
+    )
+    assert mallet is not None
+    assert {"uk": 12.5, "eu": 46.5, "us": 13.5, "au": 12.5} in mallet.rows
     jeans = chart_for(
         "Urban Outfitters", "dress", "adult", "female", product_type=ProductType.JEANS
     )

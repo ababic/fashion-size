@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_url": "https://www.salt-watersandals.co.uk/products/original-white-kids-sandal",
-  "source_notes": "Salt-Water Original kids/youth chart; EU from official table (midpoint when a range is shown). AU follows UK.",
+  "source_notes": "Salt-Water Original kids/youth chart; EU from official table (midpoint when a range is shown). AU follows UK. UK 12.5 is the midpoint of the UK 12 and UK 13 rows; US is 13.5 because kids' US sizes restart at 1 after 13.5.",
   "rows": [
     {
       "uk": 5,
@@ -50,6 +50,12 @@
       "eu": 30,
       "us": 13,
       "au": 12
+    },
+    {
+      "uk": 12.5,
+      "eu": 31,
+      "us": 13.5,
+      "au": 12.5
     },
     {
       "uk": 13,
