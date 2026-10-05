@@ -47,6 +47,7 @@ from fashion_size.types import (
     UK_WAIST_SIZE,
     ConversionScale,
     IncompatibleSizeError,
+    LengthFormula,
     LengthOutOfRangeError,
     LocaleSizeRow,
     MissingScaleError,
@@ -83,110 +84,111 @@ def test_readme_brand_chart_example():
 
 def test_readme_dress_conversion():
     value = Size.from_raw("10", UK_DRESS_SIZE)
-    converted = value.convert("eu", age_group="adult", gender="female")
-    assert converted == Size.from_raw(38, EU_DRESS_SIZE)
+    converted = value.convert_to_locale("eu", age_group="adult", gender="female")
+    assert converted.size == Size.from_raw(38, EU_DRESS_SIZE)
+    assert isinstance(converted.chart, ConversionScale)
     assert str(converted) == "EU 38"
     assert str(value) == "UK 10"
 
 
 def test_locale_charts():
     women_10 = Size.from_raw("10", UK_DRESS_SIZE)
-    assert women_10.convert("us", age_group="adult", gender="female").raw == 6
-    assert women_10.convert("au", age_group="adult", gender="female").raw == 10
-    french = women_10.convert("fr", age_group="adult", gender="female")
+    assert women_10.convert_to_locale("us", age_group="adult", gender="female").raw == 6
+    assert women_10.convert_to_locale("au", age_group="adult", gender="female").raw == 10
+    french = women_10.convert_to_locale("fr", age_group="adult", gender="female")
     assert french.size_unit is EU_DRESS_SIZE
     assert french.raw == 38
     assert str(french) == "EU 38"
 
     assert (
         Size.from_raw(38, UK_DRESS_SIZE)
-        .convert("eu", age_group="adult", gender="male")
+        .convert_to_locale("eu", age_group="adult", gender="male")
         .raw
         == 48
     )
     assert (
         Size.from_raw(38, UK_DRESS_SIZE)
-        .convert("eu", age_group="adult", gender="unisex")
+        .convert_to_locale("eu", age_group="adult", gender="unisex")
         .raw
         == 48
     )
     assert (
         Size.from_raw(8, UK_DRESS_SIZE)
-        .convert("eu", age_group="child", gender="female")
+        .convert_to_locale("eu", age_group="child", gender="female")
         .raw
         == 128
     )
 
     women_shoe = Size.from_raw(7, UK_ADULT_SHOE_SIZE)
-    assert women_shoe.convert("eu", age_group="adult", gender="female").raw == 41
-    assert women_shoe.convert("us", age_group="adult", gender="female").raw == 9
-    assert women_shoe.convert("au", age_group="adult", gender="female").raw == 9
-    half = Size.from_raw("7.5", UK_ADULT_SHOE_SIZE).convert(
+    assert women_shoe.convert_to_locale("eu", age_group="adult", gender="female").raw == 41
+    assert women_shoe.convert_to_locale("us", age_group="adult", gender="female").raw == 9
+    assert women_shoe.convert_to_locale("au", age_group="adult", gender="female").raw == 9
+    half = Size.from_raw("7.5", UK_ADULT_SHOE_SIZE).convert_to_locale(
         "eu", age_group="adult", gender="female"
     )
     assert half.raw == Decimal("41.5")
     assert str(half) == "EU 41.5"
 
     men_shoe = Size.from_raw(7, UK_ADULT_SHOE_SIZE)
-    assert men_shoe.convert("us", age_group="adult", gender="male").raw == 8
-    assert men_shoe.convert("au", age_group="adult", gender="unisex").raw == 7
+    assert men_shoe.convert_to_locale("us", age_group="adult", gender="male").raw == 8
+    assert men_shoe.convert_to_locale("au", age_group="adult", gender="unisex").raw == 7
     men_half = Size.from_raw("12.5", UK_ADULT_SHOE_SIZE)
-    assert men_half.convert("eu", age_group="adult", gender="male").raw == Decimal("47.5")
-    assert men_half.convert("us", age_group="adult", gender="male").raw == Decimal("13.5")
-    assert men_half.convert("au", age_group="adult", gender="male").raw == Decimal("12.5")
+    assert men_half.convert_to_locale("eu", age_group="adult", gender="male").raw == Decimal("47.5")
+    assert men_half.convert_to_locale("us", age_group="adult", gender="male").raw == Decimal("13.5")
+    assert men_half.convert_to_locale("au", age_group="adult", gender="male").raw == Decimal("12.5")
     assert (
         Size.from_raw(6, UK_KIDS_SHOE_SIZE)
-        .convert("eu", age_group="child", gender="male")
+        .convert_to_locale("eu", age_group="child", gender="male")
         .raw
         == 23
     )
     assert (
         Size.from_raw(0, UK_BABY_SHOE_SIZE)
-        .convert("eu", age_group="baby", gender="unisex")
+        .convert_to_locale("eu", age_group="baby", gender="unisex")
         .raw
         == 16
     )
 
     band = Size.from_raw(34, UK_BAND_SIZE)
-    assert band.convert("eu", age_group="adult", gender="female") == Size.from_raw(
+    assert band.convert_to_locale("eu", age_group="adult", gender="female").size == Size.from_raw(
         75, EU_BAND_SIZE
     )
-    assert band.convert("au", age_group="adult", gender="male").raw == 12
-    assert band.convert("fr", age_group="adult", gender="female") == Size.from_raw(
+    assert band.convert_to_locale("au", age_group="adult", gender="male").raw == 12
+    assert band.convert_to_locale("fr", age_group="adult", gender="female").size == Size.from_raw(
         90, FR_BAND_SIZE
     )
     assert (
         Size.from_raw(90, FR_BAND_SIZE)
-        .convert("uk", age_group="adult", gender="female")
+        .convert_to_locale("uk", age_group="adult", gender="female")
         .raw
         == 34
     )
 
     assert (
         Size.from_raw(32, UK_WAIST_SIZE)
-        .convert("eu", age_group="adult", gender="male")
+        .convert_to_locale("eu", age_group="adult", gender="male")
         .raw
         == 48
     )
     assert (
         Size.from_raw(40, UK_CHEST_SIZE)
-        .convert("eu", age_group="adult", gender="male")
+        .convert_to_locale("eu", age_group="adult", gender="male")
         .raw
         == 50
     )
     assert (
         Size.from_raw(22, UK_WAIST_SIZE)
-        .convert("eu", age_group="child", gender="male")
+        .convert_to_locale("eu", age_group="child", gender="male")
         .raw
         == 56
     )
 
     cup = Size.from_raw("dd", UK_CUP_SIZE)
     assert str(cup) == "DD"
-    assert cup.convert("eu", age_group="adult", gender="female").raw == "E"
+    assert cup.convert_to_locale("eu", age_group="adult", gender="female").raw == "E"
     assert (
         Size.from_raw("E", UK_CUP_SIZE)
-        .convert("us", age_group="adult", gender="female")
+        .convert_to_locale("us", age_group="adult", gender="female")
         .raw
         == "DDD"
     )
@@ -194,17 +196,21 @@ def test_locale_charts():
 
 def test_length_conversion_and_display():
     inches = Size.from_raw(32, INCH_CHEST_SIZE)
-    centimetres = inches.convert("cm")
+    centimetres = inches.convert_to_unit("cm")
     assert centimetres.size_unit is CM_CHEST_SIZE
     assert centimetres.raw == Decimal("81.28")
+    assert isinstance(centimetres.chart, LengthFormula)
     assert centimetres.localised_display("en-gb") == "81cm"
     assert centimetres.localised_display("de") == "81 cm"
     assert inches.localised_display("en-us") == '32"'
     assert inches.localised_display("fr") == "32 in"
-    assert centimetres.convert("in").raw == Decimal("32")
+    assert (
+        Size.from_raw(centimetres.raw, centimetres.size_unit).convert_to_unit("in").raw
+        == Decimal("32")
+    )
 
-    assert Size.from_raw(5, INCH_CHEST_SIZE).convert("cm").raw == Decimal("12.7")
-    assert Size.from_raw(150, INCH_CHEST_SIZE).convert("cm").raw == Decimal("381")
+    assert Size.from_raw(5, INCH_CHEST_SIZE).convert_to_unit("cm").raw == Decimal("12.7")
+    assert Size.from_raw(150, INCH_CHEST_SIZE).convert_to_unit("cm").raw == Decimal("381")
     assert (
         Size.from_raw(Decimal("10.3"), INCH_CHEST_SIZE).localised_display() == '10.5"'
     )
@@ -219,40 +225,42 @@ def test_length_conversion_and_display():
 
 def test_conversion_rejects_unknown_or_incompatible_values():
     with pytest.raises(UnknownSizeError):
-        Size.from_raw(11, UK_DRESS_SIZE).convert(
+        Size.from_raw(11, UK_DRESS_SIZE).convert_to_locale(
             "eu", age_group="adult", gender="female"
         )
     with pytest.raises(UnknownSizeError):
-        Size.from_raw(10, UK_DRESS_SIZE).convert("eu", age_group="adult", gender="male")
+        Size.from_raw(10, UK_DRESS_SIZE).convert_to_locale("eu", age_group="adult", gender="male")
     with pytest.raises(MissingScaleError):
-        Size.from_raw(10, UK_DRESS_SIZE).convert("eu")
+        Size.from_raw(10, UK_DRESS_SIZE).convert_to_locale("eu")
     with pytest.raises(MissingScaleError):
-        Size.from_raw(62, UK_DRESS_SIZE).convert(
+        Size.from_raw(62, UK_DRESS_SIZE).convert_to_locale(
             "eu", age_group="baby", gender="unisex"
         )
     with pytest.raises(ValueError, match="French|locale 'fr'|No Waist size"):
-        Size.from_raw(32, UK_WAIST_SIZE).convert("fr", age_group="adult", gender="male")
+        Size.from_raw(32, UK_WAIST_SIZE).convert_to_locale("fr", age_group="adult", gender="male")
     with pytest.raises(IncompatibleSizeError):
-        Size.from_raw(10, UK_DRESS_SIZE).convert(
+        Size.from_raw(10, UK_DRESS_SIZE).convert_to_locale(
             EU_ADULT_SHOE_SIZE, age_group="adult", gender="female"
         )
     with pytest.raises(IncompatibleSizeError):
-        Size.from_raw(32, INCH_CHEST_SIZE).convert("eu")
+        Size.from_raw(32, INCH_CHEST_SIZE).convert_to_locale("eu")
     with pytest.raises(IncompatibleSizeError):
-        Size.from_raw(10, UK_DRESS_SIZE).convert(
-            "cm", age_group="adult", gender="female"
-        )
+        Size.from_raw(10, UK_DRESS_SIZE).convert_to_unit("cm")
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("4.9"), INCH_CHEST_SIZE).convert("cm")
+        Size.from_raw(Decimal("4.9"), INCH_CHEST_SIZE).convert_to_unit("cm")
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("12.69"), CM_CHEST_SIZE).convert("in")
+        Size.from_raw(Decimal("12.69"), CM_CHEST_SIZE).convert_to_unit("in")
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("150.1"), INCH_CHEST_SIZE).convert("cm")
+        Size.from_raw(Decimal("150.1"), INCH_CHEST_SIZE).convert_to_unit("cm")
     with pytest.raises(ValueError, match="cup"):
         Size.from_raw("D-E", UK_CUP_SIZE)
 
     same = Size.from_raw(10, UK_DRESS_SIZE)
-    assert same.convert(UK_DRESS_SIZE) is same
+    unchanged = same.convert_to_locale(UK_DRESS_SIZE)
+    assert unchanged.size is same
+    assert unchanged.chart is None
+    with pytest.raises(AttributeError):
+        unchanged.convert_to_locale("eu")  # type: ignore[attr-defined]
 
 
 def test_brand_scale_replaces_the_default_chart_when_the_size_type_allows_it():
@@ -262,13 +270,14 @@ def test_brand_scale_replaces_the_default_chart_when_the_size_type_allows_it():
         gender="female",
         rows=(LocaleSizeRow.from_numbers(7, 40, 9, 9),),
     )
-    converted = Size.from_raw(7, UK_ADULT_SHOE_SIZE).convert(
+    converted = Size.from_raw(7, UK_ADULT_SHOE_SIZE).convert_to_locale(
         "eu",
         age_group="adult",
         gender="female",
         brand_scale=dune,
     )
     assert converted.raw == 40
+    assert converted.chart is dune
 
     ignored = ConversionScale(
         size_type=BAND_SIZE,
@@ -278,7 +287,7 @@ def test_brand_scale_replaces_the_default_chart_when_the_size_type_allows_it():
     )
     assert (
         Size.from_raw(34, UK_BAND_SIZE)
-        .convert(
+        .convert_to_locale(
             "eu",
             age_group="adult",
             gender="female",
@@ -289,11 +298,11 @@ def test_brand_scale_replaces_the_default_chart_when_the_size_type_allows_it():
     )
 
     with pytest.raises(IncompatibleSizeError):
-        Size.from_raw(10, UK_DRESS_SIZE).convert(
+        Size.from_raw(10, UK_DRESS_SIZE).convert_to_locale(
             "eu", age_group="adult", gender="female", brand_scale=dune
         )
     with pytest.raises(ValueError, match="both"):
-        Size.from_raw(7, UK_ADULT_SHOE_SIZE).convert(
+        Size.from_raw(7, UK_ADULT_SHOE_SIZE).convert_to_locale(
             "eu", age_group="adult", brand_scale=dune
         )
 
@@ -323,8 +332,8 @@ def test_attribute_options_and_size_unit_slugs():
 
 def test_brand_name_selects_the_shipped_chart():
     shoe = Size.from_raw(7, UK_ADULT_SHOE_SIZE)
-    default = shoe.convert("eu", age_group="adult", gender="female")
-    dune = shoe.convert(
+    default = shoe.convert_to_locale("eu", age_group="adult", gender="female")
+    dune = shoe.convert_to_locale(
         "eu",
         age_group="adult",
         gender="female",
@@ -332,9 +341,12 @@ def test_brand_name_selects_the_shipped_chart():
         product_type=ProductType.SHOES,
     )
     assert default.raw == 41
+    assert isinstance(default.chart, ConversionScale)
     assert dune.raw == 40
+    assert isinstance(dune.chart, BrandConversionChart)
+    assert dune.chart.brand_name == "Dune London"
 
-    anthropologie = shoe.convert(
+    anthropologie = shoe.convert_to_locale(
         "eu",
         age_group="adult",
         gender="female",
@@ -344,14 +356,14 @@ def test_brand_name_selects_the_shipped_chart():
     assert anthropologie.raw == default.raw
 
     outfitters = Size.from_raw(16, UK_DRESS_SIZE)
-    dresses = outfitters.convert(
+    dresses = outfitters.convert_to_locale(
         "us",
         age_group="adult",
         gender="female",
         brand="Urban Outfitters",
         product_type=ProductType.DRESSES,
     )
-    jeans = outfitters.convert(
+    jeans = outfitters.convert_to_locale(
         "us",
         age_group="adult",
         gender="female",
@@ -359,9 +371,11 @@ def test_brand_name_selects_the_shipped_chart():
         product_type=ProductType.JEANS,
     )
     assert dresses.raw == 16
+    assert isinstance(dresses.chart, BrandConversionChart)
     assert jeans.raw == 12
+    assert isinstance(jeans.chart, ConversionScale)
 
-    unknown = shoe.convert(
+    unknown = shoe.convert_to_locale(
         "eu",
         age_group="adult",
         gender="female",
@@ -369,8 +383,9 @@ def test_brand_name_selects_the_shipped_chart():
         product_type=ProductType.SHOES,
     )
     assert unknown.raw == default.raw
+    assert isinstance(unknown.chart, ConversionScale)
     with pytest.raises(ValueError, match="Unknown product type"):
-        shoe.convert(
+        shoe.convert_to_locale(
             "eu",
             age_group="adult",
             gender="female",
@@ -378,14 +393,14 @@ def test_brand_name_selects_the_shipped_chart():
             product_type="not-a-family",
         )
     with pytest.raises(ValueError, match="brand name"):
-        shoe.convert(
+        shoe.convert_to_locale(
             "eu",
             age_group="adult",
             gender="female",
             product_type=ProductType.SHOES,
         )
     with pytest.raises(ValueError, match="not both"):
-        shoe.convert(
+        shoe.convert_to_locale(
             "eu",
             age_group="adult",
             gender="female",

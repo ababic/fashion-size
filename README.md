@@ -39,10 +39,10 @@ from fashion_size import ProductType
 from fashion_size.types import UK_ADULT_SHOE_SIZE, UK_DRESS_SIZE, Size
 
 value = Size.from_raw("10", UK_DRESS_SIZE)
-value.convert("eu", age_group="adult", gender="female")
+value.convert_to_locale("eu", age_group="adult", gender="female")
 
 shoe = Size.from_raw("7", UK_ADULT_SHOE_SIZE)
-shoe.convert(
+shoe.convert_to_locale(
     "eu",
     age_group="adult",
     gender="female",
@@ -50,6 +50,8 @@ shoe.convert(
     product_type=ProductType.SHOES,
 )
 ```
+
+`convert_to_locale` converts UK / EU / US / AU / FR. `convert_to_unit` converts a length between centimetres and inches (`"cm"` or `"in"`). Both return a `ConvertedSize`: the resulting size, and the chart that produced it. A shipped brand chart is a `BrandConversionChart`. The built-in chart is a `ConversionScale`. Length conversion records a `LengthFormula` instead of a chart. `ConvertedSize` has neither method, so a converted value is not converted again.
 
 `brand` may be any string. A `BrandName` (the names in `SUPPORTED_BRANDS`) selects that brand's chart. Any other name uses the default chart, including a catalog brand with no override for that size type and product type. `product_type` is a `ProductType`. An unknown product type is an error.
 

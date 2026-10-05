@@ -15,6 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
 
 from fashion_size.brands import BrandName
+from fashion_size.charts import BrandConversionChart
 from fashion_size.demographics import (
     DEMOGRAPHIC_LABELS,
     AgeGroup,
@@ -971,30 +972,37 @@ class Size:
             return f"{token}{self.size_unit.display_suffix}"
         return token
 
-    def convert(
+    def convert_to_unit(self, unit: SizeUnit | str) -> ConvertedSize:
+        """Convert this length to centimetres or inches.
+
+        ``unit`` is ``"cm"``, ``"in"``, or a length ``SizeUnit`` on this size type.
+        Chart locales use ``convert_to_locale``. The result cannot be converted again.
+        """
+        from fashion_size.conversion import convert_to_unit as convert_length
+
+        return convert_length(self, unit)
+
+    def convert_to_locale(
         self,
-        target: SizeUnit | Locale | str,
+        locale: SizeUnit | Locale | str,
         *,
         age_group: AgeGroup | str | None = None,
         gender: Gender | str | None = None,
         brand: BrandName | str | None = None,
         product_type: ProductType | str | None = None,
         brand_scale: ConversionScale | None = None,
-    ) -> Size:
-        """Convert to another size unit on the same size type.
+    ) -> ConvertedSize:
+        """Convert to a UK / EU / US / AU / FR size on this size type.
 
-        ``target`` may be a concrete ``SizeUnit``, a chart locale
-        (``Locale.EU`` / ``"eu"``), or a length unit (``"cm"`` / ``"in"``).
-        Dress, shoe, and cup-size charts are selected by ``age_group`` and ``gender``.
-        ``brand`` is any brand string. A ``BrandName`` selects that brand's chart;
-        any other name uses the default chart. ``product_type`` is a ``ProductType``.
+        ``locale`` is a ``Locale``, a slug such as ``"eu"``, or a locale ``SizeUnit``.
+        Lengths use ``convert_to_unit``. The result records the chart that was used
+        and cannot be converted again.
         """
-        # Imported here to avoid a load-time cycle with fashion_size.conversion.
-        from fashion_size.conversion import convert as convert_size
+        from fashion_size.conversion import convert_to_locale as convert_locale
 
-        return convert_size(
+        return convert_locale(
             self,
-            target,
+            locale,
             age_group=age_group,
             gender=gender,
             brand=brand,
@@ -1004,3 +1012,45 @@ class Size:
 
     def __str__(self) -> str:
         return self.localised_display()
+
+
+@dataclass(frozen=True, slots=True)
+class LengthFormula:
+    """Centimetre/inch conversion. Not a size chart."""
+
+
+@dataclass(frozen=True, slots=True)
+class ConvertedSize:
+    """A size produced by one conversion.
+
+    ``chart`` is the chart that produced ``size``. A shipped brand chart is a
+    ``BrandConversionChart``. The built-in chart is a ``ConversionScale``. Length
+    conversion uses ``LengthFormula``. ``chart`` is ``None`` when the size was
+    already in the target unit. This type has no ``convert`` method.
+    """
+
+    size: Size
+    chart: BrandConversionChart | ConversionScale | LengthFormula | None
+
+    @property
+    def raw(self) -> Decimal | str:
+        return self.size.raw
+
+    @property
+    def size_unit(self) -> SizeUnit:
+        return self.size.size_unit
+
+    @property
+    def size_type(self) -> SizeType:
+        return self.size.size_type
+
+    def display(self) -> str:
+        """Format with ``Size.display``."""
+        return self.size.display()
+
+    def localised_display(self, locale: str | None = None) -> str:
+        """Format with ``Size.localised_display``."""
+        return self.size.localised_display(locale)
+
+    def __str__(self) -> str:
+        return str(self.size)

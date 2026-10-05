@@ -1,7 +1,7 @@
 """Hardcoded default locale conversion charts.
 
 These are industry-common approximations, not brand truth. Brand-specific charts
-live in ``fashion_size.charts``. ``convert(..., brand=..., product_type=...)``
+live in ``fashion_size.charts``. ``convert_to_locale(..., brand=..., product_type=...)``
 looks them up by brand name. ``brand_scale`` still accepts a ``ConversionScale``
 directly.
 
