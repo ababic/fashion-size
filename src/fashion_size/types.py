@@ -972,31 +972,48 @@ class Size:
             return f"{token}{self.size_unit.display_suffix}"
         return token
 
-    def convert_to_unit(self, unit: SizeUnit | str) -> ConvertedSize:
-        """Convert this length to centimetres or inches.
+    def convert_to_unit(
+        self,
+        unit: SizeUnit | str,
+        *,
+        age_group: AgeGroup | str,
+        gender: Gender | str,
+        brand_name: BrandName | str | None = None,
+        product_type: ProductType | str | None = None,
+    ) -> ConvertedSize:
+        """Convert to ``unit`` on this size type.
 
-        ``unit`` is ``"cm"``, ``"in"``, or a length ``SizeUnit`` on this size type.
-        Chart locales use ``convert_to_locale``. The result cannot be converted again.
+        ``unit`` is any ``SizeUnit`` for this size type, including a locale unit
+        such as ``EU_DRESS_SIZE``, or ``"cm"`` / ``"in"`` for a length.
+        ``age_group`` and ``gender`` are required. ``brand_name`` and
+        ``product_type`` are optional. The result records the chart that was used
+        and cannot be converted again.
         """
-        from fashion_size.conversion import convert_to_unit as convert_length
+        from fashion_size.conversion import convert_to_unit as convert_unit
 
-        return convert_length(self, unit)
+        return convert_unit(
+            self,
+            unit,
+            age_group=age_group,
+            gender=gender,
+            brand_name=brand_name,
+            product_type=product_type,
+        )
 
     def convert_to_locale(
         self,
-        locale: SizeUnit | Locale | str,
+        locale: Locale | str,
         *,
-        age_group: AgeGroup | str | None = None,
-        gender: Gender | str | None = None,
-        brand: BrandName | str | None = None,
+        age_group: AgeGroup | str,
+        gender: Gender | str,
+        brand_name: BrandName | str | None = None,
         product_type: ProductType | str | None = None,
-        brand_scale: ConversionScale | None = None,
     ) -> ConvertedSize:
-        """Convert to a UK / EU / US / AU / FR size on this size type.
+        """Convert to the ``SizeUnit`` for ``locale`` on this size type.
 
-        ``locale`` is a ``Locale``, a slug such as ``"eu"``, or a locale ``SizeUnit``.
-        Lengths use ``convert_to_unit``. The result records the chart that was used
-        and cannot be converted again.
+        ``locale`` is a ``Locale`` or a slug such as ``"eu"``. ``age_group`` and
+        ``gender`` are required. ``brand_name`` and ``product_type`` are optional.
+        This resolves the locale and calls ``convert_to_unit``.
         """
         from fashion_size.conversion import convert_to_locale as convert_locale
 
@@ -1005,9 +1022,8 @@ class Size:
             locale,
             age_group=age_group,
             gender=gender,
-            brand=brand,
+            brand_name=brand_name,
             product_type=product_type,
-            brand_scale=brand_scale,
         )
 
     def __str__(self) -> str:

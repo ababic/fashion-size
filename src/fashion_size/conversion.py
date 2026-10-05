@@ -18,13 +18,10 @@ from fashion_size.types import (
     LetterSizeRow,
     Locale,
     LocaleSizeRow,
-    MissingScaleError,
     Size,
     SizeFamily,
     SizeType,
     SizeUnit,
-    chart_genders,
-    format_age_gender,
     format_raw,
     resolve_age_gender,
     size_unit_for_length_unit,
@@ -39,65 +36,70 @@ MIN_INCHES = Decimal("5")
 MAX_INCHES = Decimal("150")
 
 
-def convert_to_unit(value: Size, unit: SizeUnit | str) -> ConvertedSize:
-    """Convert a length between centimetres and inches.
-
-    ``unit`` is ``"cm"``, ``"in"``, or a length ``SizeUnit`` on the same size type.
-    Chart locales use ``convert_to_locale``. A converted length records a
-    ``LengthFormula``. The result cannot be converted again.
-    """
-    return _convert(value, _length_target(value, unit))
-
-
-def convert_to_locale(
+def convert_to_unit(
     value: Size,
-    locale: SizeUnit | Locale | str,
+    unit: SizeUnit | str,
     *,
-    age_group: AgeGroup | str | None = None,
-    gender: Gender | str | None = None,
-    brand: BrandName | str | None = None,
+    age_group: AgeGroup | str,
+    gender: Gender | str,
+    brand_name: BrandName | str | None = None,
     product_type: ProductType | str | None = None,
-    brand_scale: ConversionScale | None = None,
 ) -> ConvertedSize:
-    """Convert ``value`` to a UK / EU / US / AU / FR size on the same size type.
+    """Convert ``value`` to ``unit`` on the same size type.
 
-    ``locale`` is a ``Locale``, a slug such as ``"eu"``, or a locale ``SizeUnit``
-    on the same size type. Lengths use ``convert_to_unit``. ``age_group`` and
-    ``gender`` select the chart. ``brand`` is any brand string. A ``BrandName``
-    selects that brand's chart; any other name uses the default. ``product_type``
-    is a ``ProductType``. ``brand_scale`` replaces the chart directly when the
-    size type allows it. Band size always uses the default chart. French band
-    size is the EU label plus 15.
+    ``unit`` is any ``SizeUnit`` for this size type, locale-based (``EU_DRESS_SIZE``)
+    or a length (``CM_CHEST_SIZE``). ``"cm"`` and ``"in"`` select the length unit.
+    ``age_group`` and ``gender`` are required. ``brand_name`` is any brand string.
+    A ``BrandName`` selects that brand's chart; any other name uses the default.
+    ``product_type`` is a ``ProductType``. Band size always uses the default chart.
+    French band size is the EU label plus 15.
 
     Returns a ``ConvertedSize`` naming the chart that was used. The result cannot
     be converted again.
     """
-    if brand is not None and brand_scale is not None:
-        raise ValueError("Pass a brand name or a brand_scale, not both.")
-    if product_type is not None and brand is None:
+    if product_type is not None and brand_name is None:
         raise ValueError("A product type needs a brand name.")
-    known_brand = resolve_brand_name(brand) if brand is not None else None
+    age, sex = resolve_age_gender(age_group, gender)
+    known_brand = resolve_brand_name(brand_name) if brand_name is not None else None
     resolved_product_type = (
         resolve_product_type(product_type) if product_type is not None else None
     )
     return _convert(
         value,
-        _locale_target(value, locale),
-        age_group=age_group,
-        gender=gender,
+        _size_unit_target(value, unit),
+        age_group=age,
+        gender=sex,
         known_brand=known_brand,
         product_type=resolved_product_type,
-        brand_scale=brand_scale,
     )
 
 
-def _length_target(value: Size, unit: SizeUnit | str) -> SizeUnit:
+def convert_to_locale(
+    value: Size,
+    locale: Locale | str,
+    *,
+    age_group: AgeGroup | str,
+    gender: Gender | str,
+    brand_name: BrandName | str | None = None,
+    product_type: ProductType | str | None = None,
+) -> ConvertedSize:
+    """Convert to the ``SizeUnit`` for ``locale`` on this size type.
+
+    ``locale`` is a ``Locale`` or a slug such as ``"eu"``. This resolves that
+    locale to a ``SizeUnit`` and calls ``convert_to_unit``.
+    """
+    return convert_to_unit(
+        value,
+        size_unit_for_locale(value.size_type, locale),
+        age_group=age_group,
+        gender=gender,
+        brand_name=brand_name,
+        product_type=product_type,
+    )
+
+
+def _size_unit_target(value: Size, unit: SizeUnit | str) -> SizeUnit:
     if isinstance(unit, SizeUnit):
-        if unit.length_unit is None:
-            raise IncompatibleSizeError(
-                f"Cannot convert {value.size_unit.label} to {unit.label} with convert_to_unit. "
-                "Use convert_to_locale."
-            )
         if unit.size_type.slug != value.size_type.slug:
             raise IncompatibleSizeError(
                 f"Cannot convert {value.size_type.label} to {unit.label} — size units must share a size type."
@@ -106,30 +108,14 @@ def _length_target(value: Size, unit: SizeUnit | str) -> SizeUnit:
     return size_unit_for_length_unit(value.size_type, unit)
 
 
-def _locale_target(value: Size, locale: SizeUnit | Locale | str) -> SizeUnit:
-    if isinstance(locale, SizeUnit):
-        if locale.length_unit is not None:
-            raise IncompatibleSizeError(
-                f"Cannot convert {value.size_unit.label} to {locale.label} with convert_to_locale. "
-                "Use convert_to_unit."
-            )
-        if locale.size_type.slug != value.size_type.slug:
-            raise IncompatibleSizeError(
-                f"Cannot convert {value.size_type.label} to {locale.label} — size units must share a size type."
-            )
-        return locale
-    return size_unit_for_locale(value.size_type, locale)
-
-
 def _convert(
     value: Size,
     resolved: SizeUnit,
     *,
-    age_group: AgeGroup | str | None = None,
-    gender: Gender | str | None = None,
+    age_group: str,
+    gender: str,
     known_brand: BrandName | None = None,
     product_type: ProductType | None = None,
-    brand_scale: ConversionScale | None = None,
 ) -> ConvertedSize:
     if not value.size_unit.can_convert_to(resolved):
         raise IncompatibleSizeError(
@@ -143,15 +129,7 @@ def _convert(
             size=Size(raw=converted, size_unit=resolved),
             chart=LengthFormula(),
         )
-    if brand_scale is not None and value.size_unit.supports_brand_overrides:
-        _validate_brand_scale(brand_scale, value, age_group, gender)
-        scale = brand_scale
-        used_chart: BrandConversionChart | ConversionScale = brand_scale
-    elif known_brand is not None and value.size_unit.supports_brand_overrides:
-        if age_group is None or gender is None:
-            raise MissingScaleError(
-                "Locale size conversion requires an age group and gender (or a brand_scale)."
-            )
+    if known_brand is not None and value.size_unit.supports_brand_overrides:
         chart = chart_for(
             known_brand,
             value.size_type.slug,
@@ -161,16 +139,11 @@ def _convert(
         )
         if chart is None:
             scale = default_scale(value.size_type, age_group, gender)
-            used_chart = scale
+            used_chart: BrandConversionChart | ConversionScale = scale
         else:
             scale = _scale_from_chart(chart, value.size_type)
-            _validate_brand_scale(scale, value, age_group, gender)
             used_chart = chart
     else:
-        if age_group is None or gender is None:
-            raise MissingScaleError(
-                "Locale size conversion requires an age group and gender (or a brand_scale)."
-            )
         scale = default_scale(value.size_type, age_group, gender)
         used_chart = scale
     return ConvertedSize(
@@ -200,30 +173,6 @@ def _scale_from_chart(chart: BrandConversionChart, size_type: SizeType) -> Conve
         gender=chart.gender,
         rows=rows,
     )
-
-
-def _validate_brand_scale(
-    brand_scale: ConversionScale,
-    value: Size,
-    age_group: AgeGroup | str | None,
-    gender: Gender | str | None,
-) -> None:
-    if brand_scale.size_type.slug != value.size_type.slug:
-        raise IncompatibleSizeError(
-            f"Brand scale is for {brand_scale.size_type.label}, not {value.size_type.label}."
-        )
-    if age_group is None and gender is None:
-        return
-    if age_group is None or gender is None:
-        raise ValueError("Pass both age_group and gender, or neither.")
-    age, sex = resolve_age_gender(age_group, gender)
-    if (brand_scale.age_group, brand_scale.gender) not in {
-        (age, candidate) for candidate in chart_genders(age, sex)
-    }:
-        raise IncompatibleSizeError(
-            f"Brand scale is for {format_age_gender(brand_scale.age_group, brand_scale.gender)}, "
-            f"not {format_age_gender(age, sex)}."
-        )
 
 
 def _inches_from_length(raw: Decimal, source: SizeUnit) -> Decimal:

@@ -46,14 +46,14 @@ shoe.convert_to_locale(
     "eu",
     age_group="adult",
     gender="female",
-    brand="Dune London",
+    brand_name="Dune London",
     product_type=ProductType.SHOES,
 )
 ```
 
-`convert_to_locale` converts UK / EU / US / AU / FR. `convert_to_unit` converts a length between centimetres and inches (`"cm"` or `"in"`). Both return a `ConvertedSize`: the resulting size, and the chart that produced it. A shipped brand chart is a `BrandConversionChart`. The built-in chart is a `ConversionScale`. Length conversion records a `LengthFormula` instead of a chart. `ConvertedSize` has neither method, so a converted value is not converted again.
+`convert_to_unit` converts to a `SizeUnit` on the same size type, whether that unit is a locale (`EU_DRESS_SIZE`) or a length (`CM_CHEST_SIZE`, or `"cm"` / `"in"`). `convert_to_locale` resolves a locale such as `"eu"` to that size type's `SizeUnit` and calls `convert_to_unit`. Both return a `ConvertedSize`: the resulting size, and the chart that produced it. A shipped brand chart is a `BrandConversionChart`. The built-in chart is a `ConversionScale`. Length conversion records a `LengthFormula` instead of a chart. `ConvertedSize` has neither method, so a converted value is not converted again.
 
-`brand` may be any string. A `BrandName` (the names in `SUPPORTED_BRANDS`) selects that brand's chart. Any other name uses the default chart, including a catalog brand with no override for that size type and product type. `product_type` is a `ProductType`. An unknown product type is an error.
+Both methods require `age_group` and `gender`. `brand_name` may be any string. A `BrandName` (the names in `SUPPORTED_BRANDS`) selects that brand's chart. Any other name uses the default chart, including a catalog brand with no override for that size type and product type. `product_type` is an optional `ProductType`. An unknown product type is an error.
 
 French dress, shoe, cup, and chest labels are the EU size (`"fr"` converts to that EU value). French band size is the EU centimetre label plus 15. French waist size is not on the chart. Lengths convert between centimetres and inches (`1 in = 2.54 cm`) for values from 5 to 150 inches. Display rounding (nearest centimetre, nearest half inch) does not change the stored value.
 
