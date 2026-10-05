@@ -1,6 +1,6 @@
 """Size types, locale conversion, and brand size charts.
 
-Import ``Size``, ``Size.convert_to_locale``, and ``Size.convert_to_unit`` from ``fashion_size.types``.
+Import ``Size``, ``Size.convert``, and ``Size.convert_to_locale`` from ``fashion_size.types``.
 Django fields live in ``django-fashion-size``.
 """
 

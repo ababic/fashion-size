@@ -36,7 +36,7 @@ MIN_INCHES = Decimal("5")
 MAX_INCHES = Decimal("150")
 
 
-def convert_to_unit(
+def convert(
     value: Size,
     unit: SizeUnit | str,
     *,
@@ -86,9 +86,9 @@ def convert_to_locale(
     """Convert to the ``SizeUnit`` for ``locale`` on this size type.
 
     ``locale`` is a ``Locale`` or a slug such as ``"eu"``. This resolves that
-    locale to a ``SizeUnit`` and calls ``convert_to_unit``.
+    locale to a ``SizeUnit`` and calls ``convert``.
     """
-    return convert_to_unit(
+    return convert(
         value,
         size_unit_for_locale(value.size_type, locale),
         age_group=age_group,

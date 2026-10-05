@@ -84,7 +84,7 @@ def test_readme_dress_conversion():
     converted = value.convert_to_locale("eu", age_group="adult", gender="female")
     assert converted.size == Size.from_raw(38, EU_DRESS_SIZE)
     assert isinstance(converted.chart, ConversionScale)
-    direct = value.convert_to_unit(EU_DRESS_SIZE, age_group="adult", gender="female")
+    direct = value.convert(EU_DRESS_SIZE, age_group="adult", gender="female")
     assert direct.size == converted.size
     assert direct.chart == converted.chart
     assert str(converted) == "EU 38"
@@ -196,7 +196,7 @@ def test_locale_charts():
 
 def test_length_conversion_and_display():
     inches = Size.from_raw(32, INCH_CHEST_SIZE)
-    centimetres = inches.convert_to_unit("cm", age_group="adult", gender="unisex")
+    centimetres = inches.convert("cm", age_group="adult", gender="unisex")
     assert centimetres.size_unit is CM_CHEST_SIZE
     assert centimetres.raw == Decimal("81.28")
     assert isinstance(centimetres.chart, LengthFormula)
@@ -206,20 +206,20 @@ def test_length_conversion_and_display():
     assert inches.localised_display("fr") == "32 in"
     assert (
         Size.from_raw(centimetres.raw, centimetres.size_unit)
-        .convert_to_unit("in", age_group="adult", gender="unisex")
+        .convert("in", age_group="adult", gender="unisex")
         .raw
         == Decimal("32")
     )
 
     assert (
         Size.from_raw(5, INCH_CHEST_SIZE)
-        .convert_to_unit("cm", age_group="adult", gender="unisex")
+        .convert("cm", age_group="adult", gender="unisex")
         .raw
         == Decimal("12.7")
     )
     assert (
         Size.from_raw(150, INCH_CHEST_SIZE)
-        .convert_to_unit("cm", age_group="adult", gender="unisex")
+        .convert("cm", age_group="adult", gender="unisex")
         .raw
         == Decimal("381")
     )
@@ -251,7 +251,7 @@ def test_conversion_rejects_unknown_or_incompatible_values():
     with pytest.raises(ValueError, match="French|locale 'fr'|No Waist size"):
         Size.from_raw(32, UK_WAIST_SIZE).convert_to_locale("fr", age_group="adult", gender="male")
     with pytest.raises(IncompatibleSizeError):
-        Size.from_raw(10, UK_DRESS_SIZE).convert_to_unit(
+        Size.from_raw(10, UK_DRESS_SIZE).convert(
             EU_ADULT_SHOE_SIZE, age_group="adult", gender="female"
         )
     with pytest.raises(IncompatibleSizeError):
@@ -259,26 +259,26 @@ def test_conversion_rejects_unknown_or_incompatible_values():
             "eu", age_group="adult", gender="unisex"
         )
     with pytest.raises(IncompatibleSizeError):
-        Size.from_raw(10, UK_DRESS_SIZE).convert_to_unit(
+        Size.from_raw(10, UK_DRESS_SIZE).convert(
             "cm", age_group="adult", gender="female"
         )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("4.9"), INCH_CHEST_SIZE).convert_to_unit(
+        Size.from_raw(Decimal("4.9"), INCH_CHEST_SIZE).convert(
             "cm", age_group="adult", gender="unisex"
         )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("12.69"), CM_CHEST_SIZE).convert_to_unit(
+        Size.from_raw(Decimal("12.69"), CM_CHEST_SIZE).convert(
             "in", age_group="adult", gender="unisex"
         )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("150.1"), INCH_CHEST_SIZE).convert_to_unit(
+        Size.from_raw(Decimal("150.1"), INCH_CHEST_SIZE).convert(
             "cm", age_group="adult", gender="unisex"
         )
     with pytest.raises(ValueError, match="cup"):
         Size.from_raw("D-E", UK_CUP_SIZE)
 
     same = Size.from_raw(10, UK_DRESS_SIZE)
-    unchanged = same.convert_to_unit(
+    unchanged = same.convert(
         UK_DRESS_SIZE, age_group="adult", gender="female"
     )
     assert unchanged.size is same

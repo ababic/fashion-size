@@ -972,7 +972,7 @@ class Size:
             return f"{token}{self.size_unit.display_suffix}"
         return token
 
-    def convert_to_unit(
+    def convert(
         self,
         unit: SizeUnit | str,
         *,
@@ -989,9 +989,9 @@ class Size:
         ``product_type`` are optional. The result records the chart that was used
         and cannot be converted again.
         """
-        from fashion_size.conversion import convert_to_unit as convert_unit
+        from fashion_size.conversion import convert as convert_size
 
-        return convert_unit(
+        return convert_size(
             self,
             unit,
             age_group=age_group,
@@ -1013,7 +1013,7 @@ class Size:
 
         ``locale`` is a ``Locale`` or a slug such as ``"eu"``. ``age_group`` and
         ``gender`` are required. ``brand_name`` and ``product_type`` are optional.
-        This resolves the locale and calls ``convert_to_unit``.
+        This resolves the locale and calls ``convert``.
         """
         from fashion_size.conversion import convert_to_locale as convert_locale
 
