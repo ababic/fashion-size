@@ -16,9 +16,13 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-from fashion_size.brands import BRANDS, OverrideChart
+from fashion_size.brands import BRANDS, BrandName, OverrideChart, resolve_brand_name
 from fashion_size.demographics import AgeGroup, Gender
-from fashion_size.product_types import PRODUCT_TYPE_SLUGS
+from fashion_size.product_types import (
+    PRODUCT_TYPE_SLUGS,
+    ProductType,
+    resolve_product_type,
+)
 from fashion_size.size_types import SizeTypeSlug
 
 
@@ -26,17 +30,17 @@ from fashion_size.size_types import SizeTypeSlug
 class BrandConversionChart:
     """One brand chart for a size type, age group, gender, and set of product types."""
 
-    brand_name: str
+    brand_name: BrandName
     size_type: str
     age_group: str
     gender: str
-    product_types: tuple[str, ...]
+    product_types: tuple[ProductType, ...]
     updated_at: datetime
     source_url: str
     source_notes: str
     rows: tuple[dict[str, float | int | str], ...]
 
-    def covers(self, product_type: str) -> bool:
+    def covers(self, product_type: ProductType | str) -> bool:
         """Whether this chart replaces the default for ``product_type``.
 
         A chart with no product types covers every product type.
@@ -191,20 +195,20 @@ def load_brand_charts() -> tuple[BrandConversionChart, ...]:
     return tuple(chart for _, charts in _load_brands() for chart in charts)
 
 
-def charts_for_brand(brand_name: str) -> tuple[BrandConversionChart, ...]:
-    """Charts whose brand name matches, case-insensitively."""
-    key = brand_name.strip().casefold()
-    return tuple(
-        chart for chart in load_brand_charts() if chart.brand_name.casefold() == key
-    )
+def charts_for_brand(brand_name: BrandName | str) -> tuple[BrandConversionChart, ...]:
+    """Charts for a catalog brand. An unknown name has none."""
+    known = resolve_brand_name(brand_name)
+    if known is None:
+        return ()
+    return tuple(chart for chart in load_brand_charts() if chart.brand_name == known)
 
 
 def chart_for(
-    brand_name: str,
+    brand_name: BrandName | str,
     size_type: str,
     age_group: str,
     gender: str,
-    product_type: str | None = None,
+    product_type: ProductType | str | None = None,
 ) -> BrandConversionChart | None:
     """Pick a brand chart for this size type, demographic, and optional product type.
 
@@ -217,6 +221,10 @@ def chart_for(
     age = age_group.strip().lower()
     sex = gender.strip().lower()
     size_type_slug = size_type.strip().lower()
+    if product_type is not None and str(product_type).strip():
+        product_type = resolve_product_type(product_type)
+    else:
+        product_type = None
     candidates = [
         chart
         for chart in charts_for_brand(brand_name)

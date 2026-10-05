@@ -13,15 +13,19 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
-from typing import Any
+from typing import Literal
 
+from fashion_size.brands import BrandName
+from fashion_size.charts import BrandConversionChart
 from fashion_size.demographics import (
     DEMOGRAPHIC_LABELS,
     AgeGroup,
+    Demographic,
     Gender,
     age_group_label,
     gender_label,
 )
+from fashion_size.product_types import ProductType
 from fashion_size.size_types import SizeTypeSlug
 
 
@@ -972,64 +976,178 @@ class Size:
 
     def convert(
         self,
-        target: SizeUnit | Locale | str,
+        unit: SizeUnit | Literal["cm", "in"],
         *,
-        age_group: AgeGroup | str | None = None,
-        gender: Gender | str | None = None,
-        brand_scale: ConversionScale | None = None,
-    ) -> Size:
-        """Convert to another size unit on the same size type.
+        demographic: Demographic,
+        brand_name: BrandName | str | None = None,
+        product_type: ProductType | str | None = None,
+        strict_brand_name: bool = False,
+    ) -> ConvertedSize:
+        """Convert to ``unit`` on this size type.
 
-        ``target`` may be a concrete ``SizeUnit``, a chart locale
-        (``Locale.EU`` / ``"eu"``), or a length unit (``"cm"`` / ``"in"``).
-        Dress, shoe, and cup-size charts are selected by ``age_group`` and ``gender``.
+        ``unit`` is a ``SizeUnit`` for this size type, or ``"cm"`` / ``"in"`` for a
+        length. Chart locales use ``convert_to_locale``. The result records how the
+        size was produced and cannot be converted again.
         """
-        # Imported here to avoid a load-time cycle with fashion_size.conversion.
         from fashion_size.conversion import convert as convert_size
 
         return convert_size(
             self,
-            target,
-            age_group=age_group,
-            gender=gender,
-            brand_scale=brand_scale,
+            unit,
+            demographic=demographic,
+            brand_name=brand_name,
+            product_type=product_type,
+            strict_brand_name=strict_brand_name,
         )
 
     def convert_to_locale(
         self,
-        product_type_group_id: int | None,
-        target_locale: Locale | str,
+        locale: Locale | str,
         *,
-        brand: Any,
-        age_group: AgeGroup | str,
-        gender: Gender | str,
-    ) -> Size:
-        """Convert this size into ``target_locale`` for a product type group.
+        demographic: Demographic,
+        brand_name: BrandName | str | None = None,
+        product_type: ProductType | str | None = None,
+        strict_brand_name: bool = False,
+    ) -> ConvertedSize:
+        """Convert to the ``SizeUnit`` for ``locale`` on this size type.
 
-        Resolves the target size unit from this size's size type and the locale
-        (a UK dress size and ``"eu"`` become an EU dress size; a UK cup size and
-        ``Locale.US`` become a US cup size). Uses this brand's chart for
-        ``product_type_group_id`` when one is saved, otherwise the brand chart
-        with no group, otherwise the hardcoded default. Pass ``None`` when the
-        product has no product type group.
-
-        ``brand``, ``age_group``, and ``gender`` select the chart. Length size types
-        have no locale chart; use ``convert`` with ``"cm"`` or ``"in"``.
-
-        The host application registers how ``brand`` is resolved
-        (``register_brand_converter``). This package does not import the host's
-        brand model.
+        ``locale`` is a ``Locale`` or a slug such as ``"eu"``. This resolves the
+        locale and calls ``convert``.
         """
-        from fashion_size.brand_lookup import convert_with_brand
+        from fashion_size.conversion import convert_to_locale as convert_locale
 
-        return convert_with_brand(
+        return convert_locale(
             self,
-            target_locale,
-            age_group=age_group,
-            gender=gender,
-            brand=brand,
-            product_type_group=product_type_group_id,
+            locale,
+            demographic=demographic,
+            brand_name=brand_name,
+            product_type=product_type,
+            strict_brand_name=strict_brand_name,
         )
 
     def __str__(self) -> str:
         return self.localised_display()
+
+
+class ConversionSourceKind(StrEnum):
+    """How a ``ConvertedSize`` was produced."""
+
+    IDENTITY = "identity"
+    DEFAULT = "default"
+    BRAND = "brand"
+    LENGTH_FORMULA = "length_formula"
+
+
+class DefaultChartReason(StrEnum):
+    """Why a default chart was used instead of a brand chart."""
+
+    NO_BRAND = "no_brand"
+    UNKNOWN_BRAND = "unknown_brand"
+    BRAND_USES_DEFAULT = "brand_uses_default"
+    NO_MATCHING_CHART = "no_matching_chart"
+    SIZE_TYPE_USES_DEFAULT = "size_type_uses_default"
+
+
+@dataclass(frozen=True, slots=True)
+class ConversionSource:
+    """Chart or formula used for one conversion."""
+
+    kind: ConversionSourceKind
+    brand_chart: BrandConversionChart | None = None
+    default_scale: ConversionScale | None = None
+    default_reason: DefaultChartReason | None = None
+    brand_name: BrandName | str | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind is ConversionSourceKind.IDENTITY and (
+            self.brand_chart is not None
+            or self.default_scale is not None
+            or self.default_reason is not None
+            or self.brand_name is not None
+        ):
+            raise ValueError("An identity conversion has no chart.")
+        if self.kind is ConversionSourceKind.BRAND and (
+            self.brand_chart is None
+            or self.default_scale is not None
+            or self.default_reason is not None
+        ):
+            raise ValueError("A brand conversion needs a brand chart.")
+        if self.kind is ConversionSourceKind.DEFAULT and (
+            self.default_scale is None
+            or self.brand_chart is not None
+            or self.default_reason is None
+        ):
+            raise ValueError("A default conversion needs a default scale and reason.")
+        if self.kind is ConversionSourceKind.LENGTH_FORMULA and (
+            self.brand_chart is not None
+            or self.default_scale is not None
+            or self.default_reason is not None
+            or self.brand_name is not None
+        ):
+            raise ValueError("A length conversion has no chart.")
+
+    @classmethod
+    def identity(cls) -> ConversionSource:
+        return cls(ConversionSourceKind.IDENTITY)
+
+    @classmethod
+    def default(
+        cls,
+        scale: ConversionScale,
+        *,
+        reason: DefaultChartReason,
+        brand_name: BrandName | str | None = None,
+    ) -> ConversionSource:
+        return cls(
+            ConversionSourceKind.DEFAULT,
+            default_scale=scale,
+            default_reason=reason,
+            brand_name=brand_name,
+        )
+
+    @classmethod
+    def brand(cls, chart: BrandConversionChart) -> ConversionSource:
+        return cls(
+            ConversionSourceKind.BRAND,
+            brand_chart=chart,
+            brand_name=chart.brand_name,
+        )
+
+    @classmethod
+    def length_formula(cls) -> ConversionSource:
+        return cls(ConversionSourceKind.LENGTH_FORMULA)
+
+
+@dataclass(frozen=True, slots=True)
+class ConvertedSize:
+    """A size produced by one conversion.
+
+    ``source`` records how ``size`` was produced. This type has no ``convert``
+    method.
+    """
+
+    size: Size
+    source: ConversionSource
+
+    @property
+    def raw(self) -> Decimal | str:
+        return self.size.raw
+
+    @property
+    def size_unit(self) -> SizeUnit:
+        return self.size.size_unit
+
+    @property
+    def size_type(self) -> SizeType:
+        return self.size.size_type
+
+    def display(self) -> str:
+        """Format with ``Size.display``."""
+        return self.size.display()
+
+    def localised_display(self, locale: str | None = None) -> str:
+        """Format with ``Size.localised_display``."""
+        return self.size.localised_display(locale)
+
+    def __str__(self) -> str:
+        return str(self.size)
