@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "source_url": "https://mallet.com/pages/mens-shoes-size-guide",
-  "source_notes": "",
+  "source_notes": "UK 12.5 is the midpoint of the UK 12 and UK 13 rows.",
   "rows": [
     {
       "uk": 5,
@@ -50,6 +50,12 @@
       "eu": 46,
       "us": 13,
       "au": 12
+    },
+    {
+      "uk": 12.5,
+      "eu": 46.5,
+      "us": 13.5,
+      "au": 12.5
     },
     {
       "uk": 13,
