@@ -35,15 +35,27 @@ Each override chart is a JSON file named by id under `src/fashion_size/fixtures/
 ## Conversion
 
 ```python
-from fashion_size.types import UK_DRESS_SIZE, Size
+from fashion_size import ProductType
+from fashion_size.types import UK_ADULT_SHOE_SIZE, UK_DRESS_SIZE, Size
 
 value = Size.from_raw("10", UK_DRESS_SIZE)
 value.convert("eu", age_group="adult", gender="female")
+
+shoe = Size.from_raw("7", UK_ADULT_SHOE_SIZE)
+shoe.convert(
+    "eu",
+    age_group="adult",
+    gender="female",
+    brand="Dune London",
+    product_type=ProductType.SHOES,
+)
 ```
+
+`brand` may be any string. A `BrandName` (the names in `SUPPORTED_BRANDS`) selects that brand's chart. Any other name uses the default chart, including a catalog brand with no override for that size type and product type. `product_type` is a `ProductType`. An unknown product type is an error.
 
 French dress, shoe, cup, and chest labels are the EU size (`"fr"` converts to that EU value). French band size is the EU centimetre label plus 15. French waist size is not on the chart. Lengths convert between centimetres and inches (`1 in = 2.54 cm`) for values from 5 to 150 inches. Display rounding (nearest centimetre, nearest half inch) does not change the stored value.
 
-Display language defaults to `en-gb`. A host application can register its own getter (Django's `get_language`, for example) with `fashion_size.register_display_language`. Brand-specific conversion is supplied the same way, via `fashion_size.register_brand_converter`.
+Display language defaults to `en-gb`. A host application can register its own getter (Django's `get_language`, for example) with `fashion_size.register_display_language`.
 
 ## Development
 

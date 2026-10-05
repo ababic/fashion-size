@@ -11,6 +11,47 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import StrEnum
+
+from fashion_size.product_types import ProductType
+
+
+class BrandName(StrEnum):
+    """Catalog brand name. The value is the spelling used on charts."""
+
+    ANTHROPOLOGIE = "Anthropologie"
+    DUNE_LONDON = "Dune London"
+    ELV_DENIM = "E.L.V. Denim"
+    ESSKA = "Esska"
+    FATFACE = "FatFace"
+    FINISTERRE = "Finisterre"
+    HUSH = "Hush"
+    JACAMO = "Jacamo"
+    JANJI = "Janji"
+    KICKERS = "Kickers"
+    KILLSTAR = "KILLSTAR"
+    LULULEMON = "lululemon"
+    MALLET = "Mallet"
+    MANNERS_LONDON = "Manners London"
+    MARKS_AND_SPENCER = "Marks & Spencer"
+    NOBODYS_CHILD = "Nobody's Child"
+    OLIVER_BONAS = "Oliver Bonas"
+    ONLY_THE_BLIND = "Only The Blind"
+    PARLEZ = "Parlez"
+    PASSENGER = "Passenger"
+    PENELOPE_CHILVERS = "Penelope Chilvers"
+    PRETTY_YOU = "Pretty You"
+    RAPANUI = "Rapanui"
+    REFLO = "Reflo"
+    REISS = "Reiss"
+    RIVER_ISLAND = "River Island"
+    SALT_WATER_SANDALS = "Salt-Water Sandals"
+    SEASALT_CORNWALL = "Seasalt Cornwall"
+    SIMPLY_BE = "Simply Be"
+    SWEATY_BETTY = "Sweaty Betty"
+    TALA = "TALA"
+    THREADBARE = "Threadbare"
+    URBAN_OUTFITTERS = "Urban Outfitters"
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,7 +62,7 @@ class OverrideChart:
     size_type: str
     age_group: str
     gender: str
-    product_types: tuple[str, ...]
+    product_types: tuple[ProductType, ...]
     updated_at: datetime
 
 
@@ -33,7 +74,7 @@ class Brand:
     means the published guide was accepted as the default charts.
     """
 
-    name: str
+    name: BrandName
     charts: tuple[OverrideChart, ...] = ()
 
     @property
@@ -43,16 +84,16 @@ class Brand:
 
 
 BRANDS: tuple[Brand, ...] = (
-    Brand("Anthropologie"),
+    Brand(BrandName.ANTHROPOLOGIE),
     Brand(
-        "Dune London",
+        BrandName.DUNE_LONDON,
         charts=(
             OverrideChart(
                 id="986c0c43-fe4d-4741-af34-99e522e607c4",
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="female",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
@@ -60,42 +101,42 @@ BRANDS: tuple[Brand, ...] = (
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="male",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
-    Brand("E.L.V. Denim"),
+    Brand(BrandName.ELV_DENIM),
     Brand(
-        "Esska",
+        BrandName.ESSKA,
         charts=(
             OverrideChart(
                 id="b003833b-5930-44dd-8c0a-0795865e02dd",
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="female",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
-    Brand("FatFace"),
-    Brand("Finisterre"),
-    Brand("Hush"),
-    Brand("Jacamo"),
-    Brand("Janji"),
-    Brand("Kickers"),
-    Brand("KILLSTAR"),
-    Brand("lululemon"),
+    Brand(BrandName.FATFACE),
+    Brand(BrandName.FINISTERRE),
+    Brand(BrandName.HUSH),
+    Brand(BrandName.JACAMO),
+    Brand(BrandName.JANJI),
+    Brand(BrandName.KICKERS),
+    Brand(BrandName.KILLSTAR),
+    Brand(BrandName.LULULEMON),
     Brand(
-        "Mallet",
+        BrandName.MALLET,
         charts=(
             OverrideChart(
                 id="b93a2493-220b-4a6f-aa43-eea55506dfe7",
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="male",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
@@ -103,39 +144,39 @@ BRANDS: tuple[Brand, ...] = (
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="female",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
-    Brand("Manners London"),
-    Brand("Marks & Spencer"),
-    Brand("Nobody's Child"),
-    Brand("Oliver Bonas"),
+    Brand(BrandName.MANNERS_LONDON),
+    Brand(BrandName.MARKS_AND_SPENCER),
+    Brand(BrandName.NOBODYS_CHILD),
+    Brand(BrandName.OLIVER_BONAS),
     Brand(
-        "Only The Blind",
+        BrandName.ONLY_THE_BLIND,
         charts=(
             OverrideChart(
                 id="d01ea2f4-1000-43b6-86ba-905c44bd2236",
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="male",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
-    Brand("Parlez"),
-    Brand("Passenger"),
+    Brand(BrandName.PARLEZ),
+    Brand(BrandName.PASSENGER),
     Brand(
-        "Penelope Chilvers",
+        BrandName.PENELOPE_CHILVERS,
         charts=(
             OverrideChart(
                 id="dcdef7f9-de9d-4238-a045-1f9ef8157107",
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="female",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
@@ -143,25 +184,25 @@ BRANDS: tuple[Brand, ...] = (
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="male",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
-    Brand("Pretty You"),
-    Brand("Rapanui"),
-    Brand("Reflo"),
-    Brand("Reiss"),
-    Brand("River Island"),
+    Brand(BrandName.PRETTY_YOU),
+    Brand(BrandName.RAPANUI),
+    Brand(BrandName.REFLO),
+    Brand(BrandName.REISS),
+    Brand(BrandName.RIVER_ISLAND),
     Brand(
-        "Salt-Water Sandals",
+        BrandName.SALT_WATER_SANDALS,
         charts=(
             OverrideChart(
                 id="a76bff9f-21af-4745-9b5a-014b8fa6e805",
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="female",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
@@ -169,18 +210,18 @@ BRANDS: tuple[Brand, ...] = (
                 size_type="kids-shoe",
                 age_group="child",
                 gender="",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
-    Brand("Seasalt Cornwall"),
-    Brand("Simply Be"),
-    Brand("Sweaty Betty"),
-    Brand("TALA"),
-    Brand("Threadbare"),
+    Brand(BrandName.SEASALT_CORNWALL),
+    Brand(BrandName.SIMPLY_BE),
+    Brand(BrandName.SWEATY_BETTY),
+    Brand(BrandName.TALA),
+    Brand(BrandName.THREADBARE),
     Brand(
-        "Urban Outfitters",
+        BrandName.URBAN_OUTFITTERS,
         charts=(
             OverrideChart(
                 id="2df783be-e0c8-46b7-8ae5-60924def56d5",
@@ -188,17 +229,17 @@ BRANDS: tuple[Brand, ...] = (
                 age_group="adult",
                 gender="female",
                 product_types=(
-                    "trousers",
-                    "shirts",
-                    "dress-shirts",
-                    "suits",
-                    "suit-jackets",
-                    "dresses",
-                    "underwear",
-                    "casual-tops",
-                    "knitwear",
-                    "activewear-tops",
-                    "activewear-bottoms",
+                    ProductType.TROUSERS,
+                    ProductType.SHIRTS,
+                    ProductType.DRESS_SHIRTS,
+                    ProductType.SUITS,
+                    ProductType.SUIT_JACKETS,
+                    ProductType.DRESSES,
+                    ProductType.UNDERWEAR,
+                    ProductType.CASUAL_TOPS,
+                    ProductType.KNITWEAR,
+                    ProductType.ACTIVEWEAR_TOPS,
+                    ProductType.ACTIVEWEAR_BOTTOMS,
                 ),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
@@ -207,7 +248,7 @@ BRANDS: tuple[Brand, ...] = (
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="female",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
@@ -215,11 +256,28 @@ BRANDS: tuple[Brand, ...] = (
                 size_type="adult-shoe",
                 age_group="adult",
                 gender="male",
-                product_types=("shoes",),
+                product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
 )
 
-SUPPORTED_BRANDS: tuple[str, ...] = tuple(brand.name for brand in BRANDS)
+SUPPORTED_BRANDS: tuple[BrandName, ...] = tuple(brand.name for brand in BRANDS)
+
+
+def resolve_brand_name(name: BrandName | str) -> BrandName | None:
+    """Return the catalog ``BrandName`` for ``name``, or ``None`` when it is not listed.
+
+    Matching ignores case and surrounding whitespace. A name that is not in the
+    catalog is not an error: conversion uses the default chart.
+    """
+    if isinstance(name, BrandName):
+        return name
+    key = name.strip().casefold()
+    if not key:
+        return None
+    for brand in BrandName:
+        if brand.casefold() == key:
+            return brand
+    return None

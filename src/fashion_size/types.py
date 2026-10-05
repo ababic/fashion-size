@@ -13,8 +13,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
-from typing import Any
 
+from fashion_size.brands import BrandName
 from fashion_size.demographics import (
     DEMOGRAPHIC_LABELS,
     AgeGroup,
@@ -22,6 +22,7 @@ from fashion_size.demographics import (
     age_group_label,
     gender_label,
 )
+from fashion_size.product_types import ProductType
 from fashion_size.size_types import SizeTypeSlug
 
 
@@ -976,6 +977,8 @@ class Size:
         *,
         age_group: AgeGroup | str | None = None,
         gender: Gender | str | None = None,
+        brand: BrandName | str | None = None,
+        product_type: ProductType | str | None = None,
         brand_scale: ConversionScale | None = None,
     ) -> Size:
         """Convert to another size unit on the same size type.
@@ -983,6 +986,8 @@ class Size:
         ``target`` may be a concrete ``SizeUnit``, a chart locale
         (``Locale.EU`` / ``"eu"``), or a length unit (``"cm"`` / ``"in"``).
         Dress, shoe, and cup-size charts are selected by ``age_group`` and ``gender``.
+        ``brand`` is any brand string. A ``BrandName`` selects that brand's chart;
+        any other name uses the default chart. ``product_type`` is a ``ProductType``.
         """
         # Imported here to avoid a load-time cycle with fashion_size.conversion.
         from fashion_size.conversion import convert as convert_size
@@ -992,43 +997,9 @@ class Size:
             target,
             age_group=age_group,
             gender=gender,
-            brand_scale=brand_scale,
-        )
-
-    def convert_to_locale(
-        self,
-        product_type_group_id: int | None,
-        target_locale: Locale | str,
-        *,
-        brand: Any,
-        age_group: AgeGroup | str,
-        gender: Gender | str,
-    ) -> Size:
-        """Convert this size into ``target_locale`` for a product type group.
-
-        Resolves the target size unit from this size's size type and the locale
-        (a UK dress size and ``"eu"`` become an EU dress size; a UK cup size and
-        ``Locale.US`` become a US cup size). Uses this brand's chart for
-        ``product_type_group_id`` when one is saved, otherwise the brand chart
-        with no group, otherwise the hardcoded default. Pass ``None`` when the
-        product has no product type group.
-
-        ``brand``, ``age_group``, and ``gender`` select the chart. Length size types
-        have no locale chart; use ``convert`` with ``"cm"`` or ``"in"``.
-
-        The host application registers how ``brand`` is resolved
-        (``register_brand_converter``). This package does not import the host's
-        brand model.
-        """
-        from fashion_size.brand_lookup import convert_with_brand
-
-        return convert_with_brand(
-            self,
-            target_locale,
-            age_group=age_group,
-            gender=gender,
             brand=brand,
-            product_type_group=product_type_group_id,
+            product_type=product_type,
+            brand_scale=brand_scale,
         )
 
     def __str__(self) -> str:

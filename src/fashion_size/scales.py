@@ -1,7 +1,9 @@
 """Hardcoded default locale conversion charts.
 
 These are industry-common approximations, not brand truth. Brand-specific charts
-live in ``fashion_size.charts`` and are passed into ``convert(..., brand_scale=...)``.
+live in ``fashion_size.charts``. ``convert(..., brand=..., product_type=...)``
+looks them up by brand name. ``brand_scale`` still accepts a ``ConversionScale``
+directly.
 
 Charts are keyed by the same ``age_group`` × ``gender`` pair used on catalogue
 items. Row order is ``(uk, eu, us, au)``.

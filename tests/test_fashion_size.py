@@ -15,10 +15,9 @@ from fashion_size import (
     SUPPORTED_BRANDS,
     ProductType,
     __version__,
-    register_brand_converter,
     register_display_language,
 )
-from fashion_size.brands import BRANDS
+from fashion_size.brands import BRANDS, BrandName
 from fashion_size.charts import (
     BrandConversionChart,
     _parse_rows,
@@ -322,37 +321,83 @@ def test_attribute_options_and_size_unit_slugs():
     assert "uk-adult-shoe-size" not in dict(size_unit_choices_for_type("dress"))
 
 
-def test_brand_converter_hook():
-    value = Size.from_raw(10, UK_DRESS_SIZE)
-    with pytest.raises(RuntimeError, match="register_brand_converter"):
-        value.convert_to_locale(
-            None, "eu", brand="Dune London", age_group="adult", gender="female"
-        )
-
-    seen = {}
-
-    def converter(size, target_locale, *, age_group, gender, brand, product_type_group):
-        seen.update(
-            age_group=age_group,
-            gender=gender,
-            brand=brand,
-            product_type_group=product_type_group,
-            target_locale=target_locale,
-        )
-        return size.convert(target_locale, age_group=age_group, gender=gender)
-
-    register_brand_converter(converter)
-    converted = value.convert_to_locale(
-        7, "eu", brand="Dune London", age_group="adult", gender="female"
+def test_brand_name_selects_the_shipped_chart():
+    shoe = Size.from_raw(7, UK_ADULT_SHOE_SIZE)
+    default = shoe.convert("eu", age_group="adult", gender="female")
+    dune = shoe.convert(
+        "eu",
+        age_group="adult",
+        gender="female",
+        brand="  dune LONDON ",
+        product_type=ProductType.SHOES,
     )
-    assert converted.raw == 38
-    assert seen == {
-        "age_group": "adult",
-        "gender": "female",
-        "brand": "Dune London",
-        "product_type_group": 7,
-        "target_locale": "eu",
-    }
+    assert default.raw == 41
+    assert dune.raw == 40
+
+    anthropologie = shoe.convert(
+        "eu",
+        age_group="adult",
+        gender="female",
+        brand="Anthropologie",
+        product_type="shoes",
+    )
+    assert anthropologie.raw == default.raw
+
+    outfitters = Size.from_raw(16, UK_DRESS_SIZE)
+    dresses = outfitters.convert(
+        "us",
+        age_group="adult",
+        gender="female",
+        brand="Urban Outfitters",
+        product_type=ProductType.DRESSES,
+    )
+    jeans = outfitters.convert(
+        "us",
+        age_group="adult",
+        gender="female",
+        brand="Urban Outfitters",
+        product_type=ProductType.JEANS,
+    )
+    assert dresses.raw == 16
+    assert jeans.raw == 12
+
+    unknown = shoe.convert(
+        "eu",
+        age_group="adult",
+        gender="female",
+        brand="Not a brand",
+        product_type=ProductType.SHOES,
+    )
+    assert unknown.raw == default.raw
+    with pytest.raises(ValueError, match="Unknown product type"):
+        shoe.convert(
+            "eu",
+            age_group="adult",
+            gender="female",
+            brand="Dune London",
+            product_type="not-a-family",
+        )
+    with pytest.raises(ValueError, match="brand name"):
+        shoe.convert(
+            "eu",
+            age_group="adult",
+            gender="female",
+            product_type=ProductType.SHOES,
+        )
+    with pytest.raises(ValueError, match="not both"):
+        shoe.convert(
+            "eu",
+            age_group="adult",
+            gender="female",
+            brand="Dune London",
+            product_type=ProductType.SHOES,
+            brand_scale=ConversionScale(
+                size_type=ADULT_SHOE,
+                age_group="adult",
+                gender="female",
+                rows=(LocaleSizeRow.from_numbers(7, 40, 9, 9),),
+            ),
+        )
 
 
 def test_shipped_brand_charts_are_complete():
@@ -462,6 +507,7 @@ def test_override_files_match_the_catalog():
     assert len(ids) == len(set(ids))
     assert {path.stem for path in directory.glob("*.json")} == set(ids)
     assert tuple(brand.name for brand in BRANDS) == SUPPORTED_BRANDS
+    assert set(BrandName) == set(SUPPORTED_BRANDS)
     anthropologie = next(brand for brand in BRANDS if brand.name == "Anthropologie")
     dune = next(brand for brand in BRANDS if brand.name == "Dune London")
     assert not anthropologie.differs_from_default

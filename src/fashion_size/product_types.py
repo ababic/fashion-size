@@ -56,3 +56,14 @@ PRODUCT_TYPES: tuple[ProductType, ...] = tuple(ProductType)
 PRODUCT_TYPE_SLUGS: frozenset[str] = frozenset(
     product_type.value for product_type in PRODUCT_TYPES
 )
+
+
+def resolve_product_type(product_type: ProductType | str) -> ProductType:
+    """Return the product type for a ``ProductType`` or its slug."""
+    if isinstance(product_type, ProductType):
+        return product_type
+    key = str(product_type).strip().lower()
+    try:
+        return ProductType(key)
+    except ValueError as exc:
+        raise ValueError(f"Unknown product type {product_type!r}.") from exc
