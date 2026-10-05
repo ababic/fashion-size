@@ -57,8 +57,8 @@ from fashion_size.types import (
 )
 
 
-def test_version_is_the_initial_release():
-    assert __version__ == "0.1.0"
+def test_version_is_the_current_release():
+    assert __version__ == "1.0.0"
 
 
 def test_readme_brand_chart_example():

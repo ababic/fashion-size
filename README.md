@@ -78,7 +78,7 @@ Publishing uses [PyPI trusted publishing](https://docs.pypi.org/trusted-publishe
 - Workflow: `release.yml`
 - Environment: `pypi`
 
-Create a GitHub environment named `pypi` (no secrets). Tag `v0.1.0` — the tag must match `fashion_size.__version__` — to test, build the distributions, attach them to a GitHub release, and publish to PyPI.
+Create a GitHub environment named `pypi` (no secrets). Tag `v1.0.0` — the tag must match `fashion_size.__version__` — to test, build the distributions, attach them to a GitHub release, and publish to PyPI.
 
 ## License
 
