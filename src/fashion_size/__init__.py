@@ -11,6 +11,7 @@ from fashion_size.product_types import PRODUCT_TYPES, ProductType
 from fashion_size.types import (
     ConversionSource,
     ConversionSourceKind,
+    DefaultChartReason,
     register_display_language,
 )
 
@@ -18,6 +19,7 @@ __all__ = [
     "BrandName",
     "ConversionSource",
     "ConversionSourceKind",
+    "DefaultChartReason",
     "Demographic",
     "PRODUCT_TYPES",
     "ProductType",

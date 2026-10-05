@@ -266,6 +266,14 @@ BRANDS: tuple[Brand, ...] = (
 SUPPORTED_BRANDS: tuple[BrandName, ...] = tuple(brand.name for brand in BRANDS)
 
 
+def brand_differs_from_default(name: BrandName) -> bool:
+    """Whether the catalog lists any override chart for ``name``."""
+    for brand in BRANDS:
+        if brand.name == name:
+            return brand.differs_from_default
+    raise ValueError(f"Unknown brand {name!r}.")
+
+
 def resolve_brand_name(name: BrandName | str) -> BrandName | None:
     """Return the catalog ``BrandName`` for ``name``, or ``None`` when it is not listed.
 

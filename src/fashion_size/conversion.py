@@ -5,7 +5,11 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Literal
 
-from fashion_size.brands import BrandName, resolve_brand_name
+from fashion_size.brands import (
+    BrandName,
+    brand_differs_from_default,
+    resolve_brand_name,
+)
 from fashion_size.charts import BrandConversionChart, chart_for
 from fashion_size.demographics import Demographic
 from fashion_size.product_types import ProductType, resolve_product_type
@@ -14,6 +18,7 @@ from fashion_size.types import (
     ConversionScale,
     ConversionSource,
     ConvertedSize,
+    DefaultChartReason,
     IncompatibleSizeError,
     LengthOutOfRangeError,
     LetterSizeRow,
@@ -66,6 +71,7 @@ def convert(
         _size_unit_target(value, unit),
         age_group=age,
         gender=sex,
+        brand_name=brand_name,
         known_brand=known_brand,
         product_type=resolved_product_type,
     )
@@ -116,12 +122,50 @@ def _size_unit_target(value: Size, unit: SizeUnit | LengthUnitSlug) -> SizeUnit:
     return size_unit_for_length_unit(value.size_type, unit)
 
 
+def _default_source(
+    scale: ConversionScale,
+    *,
+    brand_name: BrandName | str | None,
+    known_brand: BrandName | None,
+    supports_brand_overrides: bool,
+    chart: BrandConversionChart | None,
+) -> ConversionSource:
+    if brand_name is None:
+        return ConversionSource.default(scale, reason=DefaultChartReason.NO_BRAND)
+    if known_brand is None:
+        return ConversionSource.default(
+            scale,
+            reason=DefaultChartReason.UNKNOWN_BRAND,
+            brand_name=brand_name,
+        )
+    if not supports_brand_overrides:
+        return ConversionSource.default(
+            scale,
+            reason=DefaultChartReason.SIZE_TYPE_USES_DEFAULT,
+            brand_name=known_brand,
+        )
+    if chart is not None:
+        raise ValueError("chart must be omitted when building a default source.")
+    if not brand_differs_from_default(known_brand):
+        return ConversionSource.default(
+            scale,
+            reason=DefaultChartReason.BRAND_USES_DEFAULT,
+            brand_name=known_brand,
+        )
+    return ConversionSource.default(
+        scale,
+        reason=DefaultChartReason.NO_MATCHING_CHART,
+        brand_name=known_brand,
+    )
+
+
 def _convert(
     value: Size,
     resolved: SizeUnit,
     *,
     age_group: str,
     gender: str,
+    brand_name: BrandName | str | None = None,
     known_brand: BrandName | None = None,
     product_type: ProductType | None = None,
 ) -> ConvertedSize:
@@ -137,6 +181,7 @@ def _convert(
             size=Size(raw=converted, size_unit=resolved),
             source=ConversionSource.length_formula(),
         )
+    chart: BrandConversionChart | None = None
     if known_brand is not None and value.size_unit.supports_brand_overrides:
         chart = chart_for(
             known_brand,
@@ -145,15 +190,18 @@ def _convert(
             gender,
             product_type=product_type,
         )
-        if chart is None:
-            scale = default_scale(value.size_type, age_group, gender)
-            source = ConversionSource.default(scale)
-        else:
-            scale = _scale_from_chart(chart, value.size_type)
-            source = ConversionSource.brand(chart)
+    if chart is not None:
+        scale = _scale_from_chart(chart, value.size_type)
+        source = ConversionSource.brand(chart)
     else:
         scale = default_scale(value.size_type, age_group, gender)
-        source = ConversionSource.default(scale)
+        source = _default_source(
+            scale,
+            brand_name=brand_name,
+            known_brand=known_brand,
+            supports_brand_overrides=value.size_unit.supports_brand_overrides,
+            chart=chart,
+        )
     return ConvertedSize(
         size=Size(
             raw=scale.convert_raw(value.raw, value.size_unit, resolved),

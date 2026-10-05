@@ -53,7 +53,7 @@ shoe.convert_to_locale(
 
 `convert` takes a `SizeUnit` on the same size type, or `"cm"` / `"in"` for a length. `convert_to_locale` resolves a locale such as `"eu"` to that size type's `SizeUnit` and calls `convert`. Both require a `Demographic` (age group and gender). Optional `brand_name` and `product_type` select a brand chart. Set `strict_brand_name=True` to reject a brand name that is not in `SUPPORTED_BRANDS`.
 
-Both return a `ConvertedSize` with the resulting size and a `ConversionSource` (`identity`, `default`, `brand`, or `length_formula`). `ConvertedSize` has no conversion method, so a converted value is not converted again.
+Both return a `ConvertedSize` with the resulting size and a `ConversionSource` (`identity`, `default`, `brand`, or `length_formula`). When the default chart is used, `source.default_reason` says why: no brand was passed (`no_brand`), the name is not in the catalog (`unknown_brand`), the catalog brand has no override charts (`brand_uses_default`), or the brand has no chart for this size type and product type (`no_matching_chart`). Band size with a brand name records `size_type_uses_default`. `ConvertedSize` has no conversion method, so a converted value is not converted again.
 
 `brand_name` may be any string. A `BrandName` selects that brand's chart. Any other name uses the default chart unless `strict_brand_name` is set. An unknown `product_type` is an error.
 

@@ -1038,6 +1038,16 @@ class ConversionSourceKind(StrEnum):
     LENGTH_FORMULA = "length_formula"
 
 
+class DefaultChartReason(StrEnum):
+    """Why a default chart was used instead of a brand chart."""
+
+    NO_BRAND = "no_brand"
+    UNKNOWN_BRAND = "unknown_brand"
+    BRAND_USES_DEFAULT = "brand_uses_default"
+    NO_MATCHING_CHART = "no_matching_chart"
+    SIZE_TYPE_USES_DEFAULT = "size_type_uses_default"
+
+
 @dataclass(frozen=True, slots=True)
 class ConversionSource:
     """Chart or formula used for one conversion."""
@@ -1045,22 +1055,34 @@ class ConversionSource:
     kind: ConversionSourceKind
     brand_chart: BrandConversionChart | None = None
     default_scale: ConversionScale | None = None
+    default_reason: DefaultChartReason | None = None
+    brand_name: BrandName | str | None = None
 
     def __post_init__(self) -> None:
         if self.kind is ConversionSourceKind.IDENTITY and (
-            self.brand_chart is not None or self.default_scale is not None
+            self.brand_chart is not None
+            or self.default_scale is not None
+            or self.default_reason is not None
+            or self.brand_name is not None
         ):
             raise ValueError("An identity conversion has no chart.")
         if self.kind is ConversionSourceKind.BRAND and (
-            self.brand_chart is None or self.default_scale is not None
+            self.brand_chart is None
+            or self.default_scale is not None
+            or self.default_reason is not None
         ):
             raise ValueError("A brand conversion needs a brand chart.")
         if self.kind is ConversionSourceKind.DEFAULT and (
-            self.default_scale is None or self.brand_chart is not None
+            self.default_scale is None
+            or self.brand_chart is not None
+            or self.default_reason is None
         ):
-            raise ValueError("A default conversion needs a default scale.")
+            raise ValueError("A default conversion needs a default scale and reason.")
         if self.kind is ConversionSourceKind.LENGTH_FORMULA and (
-            self.brand_chart is not None or self.default_scale is not None
+            self.brand_chart is not None
+            or self.default_scale is not None
+            or self.default_reason is not None
+            or self.brand_name is not None
         ):
             raise ValueError("A length conversion has no chart.")
 
@@ -1069,12 +1091,27 @@ class ConversionSource:
         return cls(ConversionSourceKind.IDENTITY)
 
     @classmethod
-    def default(cls, scale: ConversionScale) -> ConversionSource:
-        return cls(ConversionSourceKind.DEFAULT, default_scale=scale)
+    def default(
+        cls,
+        scale: ConversionScale,
+        *,
+        reason: DefaultChartReason,
+        brand_name: BrandName | str | None = None,
+    ) -> ConversionSource:
+        return cls(
+            ConversionSourceKind.DEFAULT,
+            default_scale=scale,
+            default_reason=reason,
+            brand_name=brand_name,
+        )
 
     @classmethod
     def brand(cls, chart: BrandConversionChart) -> ConversionSource:
-        return cls(ConversionSourceKind.BRAND, brand_chart=chart)
+        return cls(
+            ConversionSourceKind.BRAND,
+            brand_chart=chart,
+            brand_name=chart.brand_name,
+        )
 
     @classmethod
     def length_formula(cls) -> ConversionSource:

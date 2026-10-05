@@ -14,6 +14,7 @@ import fashion_size.charts as charts
 from fashion_size import (
     SUPPORTED_BRANDS,
     ConversionSourceKind,
+    DefaultChartReason,
     Demographic,
     ProductType,
     __version__,
@@ -84,6 +85,7 @@ def test_readme_dress_conversion():
     converted = value.convert_to_locale("eu", demographic=Demographic("adult", "female"))
     assert converted.size == Size.from_raw(38, EU_DRESS_SIZE)
     assert converted.source.kind == ConversionSourceKind.DEFAULT
+    assert converted.source.default_reason == DefaultChartReason.NO_BRAND
     direct = value.convert(EU_DRESS_SIZE, demographic=Demographic("adult", "female"))
     assert direct.size == converted.size
     assert direct.source.kind == converted.source.kind
@@ -296,6 +298,7 @@ def test_band_size_uses_the_default_chart():
     )
     assert converted.raw == 75
     assert converted.source.kind == ConversionSourceKind.DEFAULT
+    assert converted.source.default_reason == DefaultChartReason.SIZE_TYPE_USES_DEFAULT
 
 
 def test_attribute_options_and_size_unit_slugs():
@@ -333,6 +336,7 @@ def test_brand_name_selects_the_shipped_chart():
     )
     assert default.raw == 41
     assert default.source.kind == ConversionSourceKind.DEFAULT
+    assert default.source.default_reason == DefaultChartReason.NO_BRAND
     assert dune.raw == 40
     assert dune.source.kind == ConversionSourceKind.BRAND
     assert dune.source.brand_chart is not None
@@ -345,6 +349,7 @@ def test_brand_name_selects_the_shipped_chart():
         product_type="shoes",
     )
     assert anthropologie.raw == default.raw
+    assert anthropologie.source.default_reason == DefaultChartReason.BRAND_USES_DEFAULT
 
     outfitters = Size.from_raw(16, UK_DRESS_SIZE)
     dresses = outfitters.convert_to_locale(
@@ -363,6 +368,7 @@ def test_brand_name_selects_the_shipped_chart():
     assert dresses.source.kind == ConversionSourceKind.BRAND
     assert jeans.raw == 12
     assert jeans.source.kind == ConversionSourceKind.DEFAULT
+    assert jeans.source.default_reason == DefaultChartReason.NO_MATCHING_CHART
 
     unknown = shoe.convert_to_locale(
         "eu",
@@ -372,6 +378,7 @@ def test_brand_name_selects_the_shipped_chart():
     )
     assert unknown.raw == default.raw
     assert unknown.source.kind == ConversionSourceKind.DEFAULT
+    assert unknown.source.default_reason == DefaultChartReason.UNKNOWN_BRAND
     with pytest.raises(ValueError, match="Unknown brand"):
         shoe.convert_to_locale(
             "eu",
