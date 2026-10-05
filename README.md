@@ -1,5 +1,13 @@
 # fashion-size
 
+[![PyPI version](https://img.shields.io/pypi/v/fashion-size.svg)](https://pypi.org/project/fashion-size/)
+[![Python versions](https://img.shields.io/pypi/pyversions/fashion-size.svg)](https://pypi.org/project/fashion-size/)
+[![License: BSD-3-Clause](https://img.shields.io/pypi/l/fashion-size.svg)](https://github.com/ababic/fashion-size/blob/main/LICENSE)
+[![Tests](https://github.com/ababic/fashion-size/actions/workflows/test.yml/badge.svg)](https://github.com/ababic/fashion-size/actions/workflows/test.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Typed](https://img.shields.io/badge/typed-py.typed-ff69b4)](https://github.com/ababic/fashion-size/tree/main/src/fashion_size/py.typed)
+[![Dependencies](https://img.shields.io/badge/dependencies-zero-2ea44f)](https://pypi.org/project/fashion-size/)
+
 Size types (UK dress size, EU adult shoe size, chest in centimetres) and the charts that convert them. Clothing and footwear share this library.
 
 ```bash
