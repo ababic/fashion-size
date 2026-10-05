@@ -6,6 +6,7 @@ These match the warehouse catalogue pair (``adult`` / ``child`` / ``baby`` with
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -67,3 +68,29 @@ def age_group_label(age_group: str) -> str:
 
 def gender_label(gender: str) -> str:
     return Gender(gender).label
+
+
+@dataclass(frozen=True, slots=True)
+class Demographic:
+    """Age group and gender pair used to pick a conversion chart."""
+
+    age_group: AgeGroup | str
+    gender: Gender | str
+
+    def as_chart_pair(self) -> tuple[str, str]:
+        """Return normalised ``(age_group, gender)`` strings for chart lookup."""
+        age = (
+            self.age_group.value
+            if isinstance(self.age_group, AgeGroup)
+            else str(self.age_group or "").strip().lower()
+        )
+        sex = (
+            self.gender.value
+            if isinstance(self.gender, Gender)
+            else str(self.gender or "").strip().lower()
+        )
+        if age not in AgeGroup:
+            raise ValueError(f"Unknown age group {self.age_group!r}.")
+        if sex not in Gender:
+            raise ValueError(f"Unknown gender {self.gender!r}.")
+        return age, sex

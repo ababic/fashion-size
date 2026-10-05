@@ -6,11 +6,19 @@ Django fields live in ``django-fashion-size``.
 
 from fashion_size.__version__ import __version__
 from fashion_size.brands import SUPPORTED_BRANDS, BrandName
+from fashion_size.demographics import Demographic
 from fashion_size.product_types import PRODUCT_TYPES, ProductType
-from fashion_size.types import register_display_language
+from fashion_size.types import (
+    ConversionSource,
+    ConversionSourceKind,
+    register_display_language,
+)
 
 __all__ = [
     "BrandName",
+    "ConversionSource",
+    "ConversionSourceKind",
+    "Demographic",
     "PRODUCT_TYPES",
     "ProductType",
     "SUPPORTED_BRANDS",

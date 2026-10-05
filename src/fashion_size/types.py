@@ -13,12 +13,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
+from typing import Literal
 
 from fashion_size.brands import BrandName
 from fashion_size.charts import BrandConversionChart
 from fashion_size.demographics import (
     DEMOGRAPHIC_LABELS,
     AgeGroup,
+    Demographic,
     Gender,
     age_group_label,
     gender_label,
@@ -974,79 +976,121 @@ class Size:
 
     def convert(
         self,
-        unit: SizeUnit | str,
+        unit: SizeUnit | Literal["cm", "in"],
         *,
-        age_group: AgeGroup | str,
-        gender: Gender | str,
+        demographic: Demographic,
         brand_name: BrandName | str | None = None,
         product_type: ProductType | str | None = None,
+        strict_brand_name: bool = False,
     ) -> ConvertedSize:
         """Convert to ``unit`` on this size type.
 
-        ``unit`` is any ``SizeUnit`` for this size type, including a locale unit
-        such as ``EU_DRESS_SIZE``, or ``"cm"`` / ``"in"`` for a length.
-        ``age_group`` and ``gender`` are required. ``brand_name`` and
-        ``product_type`` are optional. The result records the chart that was used
-        and cannot be converted again.
+        ``unit`` is a ``SizeUnit`` for this size type, or ``"cm"`` / ``"in"`` for a
+        length. Chart locales use ``convert_to_locale``. The result records how the
+        size was produced and cannot be converted again.
         """
         from fashion_size.conversion import convert as convert_size
 
         return convert_size(
             self,
             unit,
-            age_group=age_group,
-            gender=gender,
+            demographic=demographic,
             brand_name=brand_name,
             product_type=product_type,
+            strict_brand_name=strict_brand_name,
         )
 
     def convert_to_locale(
         self,
         locale: Locale | str,
         *,
-        age_group: AgeGroup | str,
-        gender: Gender | str,
+        demographic: Demographic,
         brand_name: BrandName | str | None = None,
         product_type: ProductType | str | None = None,
+        strict_brand_name: bool = False,
     ) -> ConvertedSize:
         """Convert to the ``SizeUnit`` for ``locale`` on this size type.
 
-        ``locale`` is a ``Locale`` or a slug such as ``"eu"``. ``age_group`` and
-        ``gender`` are required. ``brand_name`` and ``product_type`` are optional.
-        This resolves the locale and calls ``convert``.
+        ``locale`` is a ``Locale`` or a slug such as ``"eu"``. This resolves the
+        locale and calls ``convert``.
         """
         from fashion_size.conversion import convert_to_locale as convert_locale
 
         return convert_locale(
             self,
             locale,
-            age_group=age_group,
-            gender=gender,
+            demographic=demographic,
             brand_name=brand_name,
             product_type=product_type,
+            strict_brand_name=strict_brand_name,
         )
 
     def __str__(self) -> str:
         return self.localised_display()
 
 
+class ConversionSourceKind(StrEnum):
+    """How a ``ConvertedSize`` was produced."""
+
+    IDENTITY = "identity"
+    DEFAULT = "default"
+    BRAND = "brand"
+    LENGTH_FORMULA = "length_formula"
+
+
 @dataclass(frozen=True, slots=True)
-class LengthFormula:
-    """Centimetre/inch conversion. Not a size chart."""
+class ConversionSource:
+    """Chart or formula used for one conversion."""
+
+    kind: ConversionSourceKind
+    brand_chart: BrandConversionChart | None = None
+    default_scale: ConversionScale | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind is ConversionSourceKind.IDENTITY and (
+            self.brand_chart is not None or self.default_scale is not None
+        ):
+            raise ValueError("An identity conversion has no chart.")
+        if self.kind is ConversionSourceKind.BRAND and (
+            self.brand_chart is None or self.default_scale is not None
+        ):
+            raise ValueError("A brand conversion needs a brand chart.")
+        if self.kind is ConversionSourceKind.DEFAULT and (
+            self.default_scale is None or self.brand_chart is not None
+        ):
+            raise ValueError("A default conversion needs a default scale.")
+        if self.kind is ConversionSourceKind.LENGTH_FORMULA and (
+            self.brand_chart is not None or self.default_scale is not None
+        ):
+            raise ValueError("A length conversion has no chart.")
+
+    @classmethod
+    def identity(cls) -> ConversionSource:
+        return cls(ConversionSourceKind.IDENTITY)
+
+    @classmethod
+    def default(cls, scale: ConversionScale) -> ConversionSource:
+        return cls(ConversionSourceKind.DEFAULT, default_scale=scale)
+
+    @classmethod
+    def brand(cls, chart: BrandConversionChart) -> ConversionSource:
+        return cls(ConversionSourceKind.BRAND, brand_chart=chart)
+
+    @classmethod
+    def length_formula(cls) -> ConversionSource:
+        return cls(ConversionSourceKind.LENGTH_FORMULA)
 
 
 @dataclass(frozen=True, slots=True)
 class ConvertedSize:
     """A size produced by one conversion.
 
-    ``chart`` is the chart that produced ``size``. A shipped brand chart is a
-    ``BrandConversionChart``. The built-in chart is a ``ConversionScale``. Length
-    conversion uses ``LengthFormula``. ``chart`` is ``None`` when the size was
-    already in the target unit. This type has no ``convert`` method.
+    ``source`` records how ``size`` was produced. This type has no ``convert``
+    method.
     """
 
     size: Size
-    chart: BrandConversionChart | ConversionScale | LengthFormula | None
+    source: ConversionSource
 
     @property
     def raw(self) -> Decimal | str:

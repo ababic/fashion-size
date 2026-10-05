@@ -35,25 +35,27 @@ Each override chart is a JSON file named by id under `src/fashion_size/fixtures/
 ## Conversion
 
 ```python
-from fashion_size import ProductType
+from fashion_size import Demographic, ProductType
 from fashion_size.types import UK_ADULT_SHOE_SIZE, UK_DRESS_SIZE, Size
 
+women = Demographic("adult", "female")
 value = Size.from_raw("10", UK_DRESS_SIZE)
-value.convert_to_locale("eu", age_group="adult", gender="female")
+value.convert_to_locale("eu", demographic=women)
 
 shoe = Size.from_raw("7", UK_ADULT_SHOE_SIZE)
 shoe.convert_to_locale(
     "eu",
-    age_group="adult",
-    gender="female",
+    demographic=women,
     brand_name="Dune London",
     product_type=ProductType.SHOES,
 )
 ```
 
-`convert` takes a `SizeUnit` on the same size type, whether that unit is a locale (`EU_DRESS_SIZE`) or a length (`CM_CHEST_SIZE`, or `"cm"` / `"in"`). `convert_to_locale` resolves a locale such as `"eu"` to that size type's `SizeUnit` and calls `convert`. Both return a `ConvertedSize`: the resulting size, and the chart that produced it. A shipped brand chart is a `BrandConversionChart`. The built-in chart is a `ConversionScale`. Length conversion records a `LengthFormula` instead of a chart. `ConvertedSize` has neither method, so a converted value is not converted again.
+`convert` takes a `SizeUnit` on the same size type, or `"cm"` / `"in"` for a length. `convert_to_locale` resolves a locale such as `"eu"` to that size type's `SizeUnit` and calls `convert`. Both require a `Demographic` (age group and gender). Optional `brand_name` and `product_type` select a brand chart. Set `strict_brand_name=True` to reject a brand name that is not in `SUPPORTED_BRANDS`.
 
-Both methods require `age_group` and `gender`. `brand_name` may be any string. A `BrandName` (the names in `SUPPORTED_BRANDS`) selects that brand's chart. Any other name uses the default chart, including a catalog brand with no override for that size type and product type. `product_type` is an optional `ProductType`. An unknown product type is an error.
+Both return a `ConvertedSize` with the resulting size and a `ConversionSource` (`identity`, `default`, `brand`, or `length_formula`). `ConvertedSize` has no conversion method, so a converted value is not converted again.
+
+`brand_name` may be any string. A `BrandName` selects that brand's chart. Any other name uses the default chart unless `strict_brand_name` is set. An unknown `product_type` is an error.
 
 French dress, shoe, cup, and chest labels are the EU size (`"fr"` converts to that EU value). French band size is the EU centimetre label plus 15. French waist size is not on the chart. Lengths convert between centimetres and inches (`1 in = 2.54 cm`) for values from 5 to 150 inches. Display rounding (nearest centimetre, nearest half inch) does not change the stored value.
 
