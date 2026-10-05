@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.10.5
+
+- Release numbering follows CalVer (`YYYY.M.D`, UTC); see README.
+
 ## 1.0.0
 
 - Standalone conversion API: `Size.convert` and `Size.convert_to_locale` with required `Demographic`, optional `brand_name`, `product_type`, and `strict_brand_name`.

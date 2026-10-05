@@ -78,7 +78,15 @@ Publishing uses [PyPI trusted publishing](https://docs.pypi.org/trusted-publishe
 - Workflow: `release.yml`
 - Environment: `pypi`
 
-Create a GitHub environment named `pypi` (no secrets). Tag `v1.0.0` — the tag must match `fashion_size.__version__` — to test, build the distributions, attach them to a GitHub release, and publish to PyPI.
+Create a GitHub environment named `pypi` (no secrets).
+
+### Version numbers (CalVer)
+
+Releases use [calendar versioning](https://calver.org/): `YYYY.M.D` (UTC date when the release is tagged), for example `2026.10.5`. Git tags are `v` plus that string (`v2026.10.5`). The tag without the `v` must match `fashion_size.__version__`.
+
+For a second release on the same UTC day, bump the micro segment: `2026.10.5.1` and tag `v2026.10.5.1` (or use `.post1` if you prefer PEP 440 post-releases).
+
+Before tagging, bump `src/fashion_size/__version__.py`, update `CHANGELOG.md`, commit, then push the tag. The workflow runs tests, checks that the tag matches the package version, builds wheels, creates a GitHub release, and publishes to PyPI.
 
 ## License
 
