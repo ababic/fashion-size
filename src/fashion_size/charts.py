@@ -45,7 +45,12 @@ class BrandConversionChart:
 
         A chart with no product types covers every product type.
         """
-        return not self.product_types or product_type in self.product_types
+        if not self.product_types:
+            return True
+        try:
+            return resolve_product_type(product_type) in self.product_types
+        except ValueError:
+            return False
 
 
 def _chart_directory() -> Path:

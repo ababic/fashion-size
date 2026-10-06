@@ -31,7 +31,7 @@ from fashion_size.charts import (
     charts_for_brand,
     load_brand_charts,
 )
-from fashion_size.product_types import resolve_product_type
+from fashion_size.product_types import PRODUCT_TYPE_SLUGS, resolve_product_type
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
     CM_CHEST_SIZE,
@@ -453,6 +453,8 @@ def test_shipped_brand_charts_are_complete():
         "Urban Outfitters", "dress", "adult", " Female ", product_type="dresses"
     )
     assert dresses is not None and dresses.covers("dresses")
+    assert dresses.covers(ProductType.SUITS)
+    assert dresses.covers("suit-jackets")
 
 
 @pytest.mark.parametrize(
@@ -466,6 +468,7 @@ def test_shipped_brand_charts_are_complete():
         (ProductType.SKIRTS, "skirts", "Skirts"),
         (ProductType.SHORTS, "shorts", "Shorts"),
         (ProductType.HOSIERY, "hosiery", "Hosiery"),
+        (ProductType.SUITS, "suits", "Suits & Tailoring"),
     ],
 )
 def test_named_product_types(product_type, slug, label):
@@ -473,6 +476,12 @@ def test_named_product_types(product_type, slug, label):
     assert product_type.label == label
     assert product_type in PRODUCT_TYPES
     assert resolve_product_type(f" {slug} ") is product_type
+
+
+def test_suit_jackets_resolves_to_suits():
+    assert not hasattr(ProductType, "SUIT_JACKETS")
+    assert "suit-jackets" not in PRODUCT_TYPE_SLUGS
+    assert resolve_product_type("suit-jackets") is ProductType.SUITS
 
 
 def test_chart_with_no_product_types_covers_every_product_type():

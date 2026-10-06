@@ -19,7 +19,6 @@ class ProductType(StrEnum):
     SHIRTS = "shirts"
     DRESS_SHIRTS = "dress-shirts"
     SUITS = "suits"
-    SUIT_JACKETS = "suit-jackets"
     DRESSES = "dresses"
     SKIRTS = "skirts"
     UNDERWEAR = "underwear"
@@ -48,8 +47,7 @@ _LABELS: dict[ProductType, str] = {
     ProductType.SHORTS: "Shorts",
     ProductType.SHIRTS: "Shirts",
     ProductType.DRESS_SHIRTS: "Dress Shirts",
-    ProductType.SUITS: "Suits",
-    ProductType.SUIT_JACKETS: "Suit Jackets",
+    ProductType.SUITS: "Suits & Tailoring",
     ProductType.DRESSES: "Dresses",
     ProductType.SKIRTS: "Skirts",
     ProductType.UNDERWEAR: "Underwear",
@@ -72,6 +70,9 @@ PRODUCT_TYPES: tuple[ProductType, ...] = tuple(ProductType)
 PRODUCT_TYPE_SLUGS: frozenset[str] = frozenset(
     product_type.value for product_type in PRODUCT_TYPES
 )
+_ALIASES: dict[str, ProductType] = {
+    "suit-jackets": ProductType.SUITS,
+}
 
 
 def resolve_product_type(product_type: ProductType | str) -> ProductType:
@@ -79,6 +80,8 @@ def resolve_product_type(product_type: ProductType | str) -> ProductType:
     if isinstance(product_type, ProductType):
         return product_type
     key = str(product_type).strip().lower()
+    if key in _ALIASES:
+        return _ALIASES[key]
     try:
         return ProductType(key)
     except ValueError as exc:
