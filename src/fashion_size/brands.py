@@ -233,7 +233,6 @@ BRANDS: tuple[Brand, ...] = (
                     ProductType.SHIRTS,
                     ProductType.DRESS_SHIRTS,
                     ProductType.SUITS,
-                    ProductType.SUIT_JACKETS,
                     ProductType.DRESSES,
                     ProductType.UNDERWEAR,
                     ProductType.CASUAL_TOPS,

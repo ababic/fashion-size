@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `ProductType.SWIMWEAR`, `OUTERWEAR`, `CASUAL_BOTTOMS`, `NIGHTWEAR`, `BRAS`, `SKIRTS`, `SHORTS`, and `HOSIERY` (tights, stockings, and socks) for brand charts that cover those ranges on their own.
+- `ProductType.SUITS` is labelled `"Suits & Tailoring"`. `suit-jackets` is removed; the slug `"suit-jackets"` still resolves to `suits`.
 
 ## 2026.10.5
 
