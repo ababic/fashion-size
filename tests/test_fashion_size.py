@@ -21,7 +21,6 @@ from fashion_size import (
     __version__,
     register_display_language,
 )
-from fashion_size.product_types import resolve_product_type
 from fashion_size.brands import BRANDS, BrandName
 from fashion_size.charts import (
     BrandConversionChart,
@@ -32,6 +31,7 @@ from fashion_size.charts import (
     charts_for_brand,
     load_brand_charts,
 )
+from fashion_size.product_types import resolve_product_type
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
     CM_CHEST_SIZE,
