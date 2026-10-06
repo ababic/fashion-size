@@ -24,6 +24,7 @@ class ProductType(StrEnum):
     SWIMWEAR = "swimwear"
     CASUAL_TOPS = "casual-tops"
     KNITWEAR = "knitwear"
+    OUTERWEAR = "outerwear"
     SHOES = "shoes"
     BOOTS = "boots"
     TRAINERS = "trainers"
@@ -47,6 +48,7 @@ _LABELS: dict[ProductType, str] = {
     ProductType.SWIMWEAR: "Swimwear",
     ProductType.CASUAL_TOPS: "Casual Tops",
     ProductType.KNITWEAR: "Knitwear",
+    ProductType.OUTERWEAR: "Outerwear",
     ProductType.SHOES: "Shoes",
     ProductType.BOOTS: "Boots",
     ProductType.TRAINERS: "Trainers",

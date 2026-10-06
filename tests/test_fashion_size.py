@@ -455,11 +455,18 @@ def test_shipped_brand_charts_are_complete():
     assert dresses is not None and dresses.covers("dresses")
 
 
-def test_swimwear_is_a_product_type():
-    assert ProductType.SWIMWEAR == "swimwear"
-    assert ProductType.SWIMWEAR.label == "Swimwear"
-    assert ProductType.SWIMWEAR in PRODUCT_TYPES
-    assert resolve_product_type(" Swimwear ") is ProductType.SWIMWEAR
+@pytest.mark.parametrize(
+    ("product_type", "slug", "label"),
+    [
+        (ProductType.SWIMWEAR, "swimwear", "Swimwear"),
+        (ProductType.OUTERWEAR, "outerwear", "Outerwear"),
+    ],
+)
+def test_named_product_types(product_type, slug, label):
+    assert product_type == slug
+    assert product_type.label == label
+    assert product_type in PRODUCT_TYPES
+    assert resolve_product_type(f" {label} ") is product_type
 
 
 def test_chart_with_no_product_types_covers_every_product_type():
@@ -477,6 +484,7 @@ def test_chart_with_no_product_types_covers_every_product_type():
     assert chart.covers("jeans")
     assert chart.covers("shoes")
     assert chart.covers(ProductType.SWIMWEAR)
+    assert chart.covers(ProductType.OUTERWEAR)
 
 
 def _sample_override():

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `ProductType.SWIMWEAR` (`"swimwear"`) for brand charts that cover swimwear on their own.
+- `ProductType.SWIMWEAR` (`"swimwear"`) and `ProductType.OUTERWEAR` (`"outerwear"`) for brand charts that cover those ranges on their own.
 
 ## 2026.10.5
 
