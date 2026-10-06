@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `ProductType.SWIMWEAR`, `OUTERWEAR`, `CASUAL_BOTTOMS`, and `NIGHTWEAR` for brand charts that cover those ranges on their own.
+- `ProductType.SWIMWEAR`, `OUTERWEAR`, `CASUAL_BOTTOMS`, `NIGHTWEAR`, `BRAS`, `SKIRTS`, and `SHORTS` for brand charts that cover those ranges on their own.
 
 ## 2026.10.5
 

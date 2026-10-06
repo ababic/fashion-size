@@ -462,6 +462,9 @@ def test_shipped_brand_charts_are_complete():
         (ProductType.OUTERWEAR, "outerwear", "Outerwear"),
         (ProductType.CASUAL_BOTTOMS, "casual-bottoms", "Casual Bottoms"),
         (ProductType.NIGHTWEAR, "nightwear", "Nightwear"),
+        (ProductType.BRAS, "bras", "Bras"),
+        (ProductType.SKIRTS, "skirts", "Skirts"),
+        (ProductType.SHORTS, "shorts", "Shorts"),
     ],
 )
 def test_named_product_types(product_type, slug, label):
@@ -489,6 +492,9 @@ def test_chart_with_no_product_types_covers_every_product_type():
     assert chart.covers(ProductType.OUTERWEAR)
     assert chart.covers(ProductType.CASUAL_BOTTOMS)
     assert chart.covers(ProductType.NIGHTWEAR)
+    assert chart.covers(ProductType.BRAS)
+    assert chart.covers(ProductType.SKIRTS)
+    assert chart.covers(ProductType.SHORTS)
 
 
 def _sample_override():
