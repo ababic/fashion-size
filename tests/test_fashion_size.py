@@ -465,6 +465,7 @@ def test_shipped_brand_charts_are_complete():
         (ProductType.BRAS, "bras", "Bras"),
         (ProductType.SKIRTS, "skirts", "Skirts"),
         (ProductType.SHORTS, "shorts", "Shorts"),
+        (ProductType.HOSIERY, "hosiery", "Hosiery"),
     ],
 )
 def test_named_product_types(product_type, slug, label):
@@ -495,6 +496,7 @@ def test_chart_with_no_product_types_covers_every_product_type():
     assert chart.covers(ProductType.BRAS)
     assert chart.covers(ProductType.SKIRTS)
     assert chart.covers(ProductType.SHORTS)
+    assert chart.covers(ProductType.HOSIERY)
 
 
 def _sample_override():
