@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `ProductType.SWIMWEAR`, `OUTERWEAR`, `CASUAL_BOTTOMS`, `NIGHTWEAR`, `BRAS`, `SKIRTS`, `SHORTS`, and `HOSIERY` (tights, stockings, and socks) for brand charts that cover those ranges on their own.
+
 ## 2026.10.5
 
 - Release numbering follows CalVer (`YYYY.M.D`, UTC); see README.

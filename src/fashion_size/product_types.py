@@ -15,14 +15,22 @@ class ProductType(StrEnum):
 
     JEANS = "jeans"
     TROUSERS = "trousers"
+    SHORTS = "shorts"
     SHIRTS = "shirts"
     DRESS_SHIRTS = "dress-shirts"
     SUITS = "suits"
     SUIT_JACKETS = "suit-jackets"
     DRESSES = "dresses"
+    SKIRTS = "skirts"
     UNDERWEAR = "underwear"
+    BRAS = "bras"
+    SWIMWEAR = "swimwear"
+    NIGHTWEAR = "nightwear"
+    HOSIERY = "hosiery"
     CASUAL_TOPS = "casual-tops"
+    CASUAL_BOTTOMS = "casual-bottoms"
     KNITWEAR = "knitwear"
+    OUTERWEAR = "outerwear"
     SHOES = "shoes"
     BOOTS = "boots"
     TRAINERS = "trainers"
@@ -37,14 +45,22 @@ class ProductType(StrEnum):
 _LABELS: dict[ProductType, str] = {
     ProductType.JEANS: "Jeans",
     ProductType.TROUSERS: "Trousers",
+    ProductType.SHORTS: "Shorts",
     ProductType.SHIRTS: "Shirts",
     ProductType.DRESS_SHIRTS: "Dress Shirts",
     ProductType.SUITS: "Suits",
     ProductType.SUIT_JACKETS: "Suit Jackets",
     ProductType.DRESSES: "Dresses",
+    ProductType.SKIRTS: "Skirts",
     ProductType.UNDERWEAR: "Underwear",
+    ProductType.BRAS: "Bras",
+    ProductType.SWIMWEAR: "Swimwear",
+    ProductType.NIGHTWEAR: "Nightwear",
+    ProductType.HOSIERY: "Hosiery",
     ProductType.CASUAL_TOPS: "Casual Tops",
+    ProductType.CASUAL_BOTTOMS: "Casual Bottoms",
     ProductType.KNITWEAR: "Knitwear",
+    ProductType.OUTERWEAR: "Outerwear",
     ProductType.SHOES: "Shoes",
     ProductType.BOOTS: "Boots",
     ProductType.TRAINERS: "Trainers",

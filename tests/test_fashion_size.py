@@ -12,6 +12,7 @@ import pytest
 
 import fashion_size.charts as charts
 from fashion_size import (
+    PRODUCT_TYPES,
     SUPPORTED_BRANDS,
     ConversionSourceKind,
     DefaultChartReason,
@@ -30,6 +31,7 @@ from fashion_size.charts import (
     charts_for_brand,
     load_brand_charts,
 )
+from fashion_size.product_types import resolve_product_type
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
     CM_CHEST_SIZE,
@@ -453,6 +455,26 @@ def test_shipped_brand_charts_are_complete():
     assert dresses is not None and dresses.covers("dresses")
 
 
+@pytest.mark.parametrize(
+    ("product_type", "slug", "label"),
+    [
+        (ProductType.SWIMWEAR, "swimwear", "Swimwear"),
+        (ProductType.OUTERWEAR, "outerwear", "Outerwear"),
+        (ProductType.CASUAL_BOTTOMS, "casual-bottoms", "Casual Bottoms"),
+        (ProductType.NIGHTWEAR, "nightwear", "Nightwear"),
+        (ProductType.BRAS, "bras", "Bras"),
+        (ProductType.SKIRTS, "skirts", "Skirts"),
+        (ProductType.SHORTS, "shorts", "Shorts"),
+        (ProductType.HOSIERY, "hosiery", "Hosiery"),
+    ],
+)
+def test_named_product_types(product_type, slug, label):
+    assert product_type == slug
+    assert product_type.label == label
+    assert product_type in PRODUCT_TYPES
+    assert resolve_product_type(f" {slug} ") is product_type
+
+
 def test_chart_with_no_product_types_covers_every_product_type():
     chart = BrandConversionChart(
         brand_name=BrandName.ANTHROPOLOGIE,
@@ -467,6 +489,14 @@ def test_chart_with_no_product_types_covers_every_product_type():
     )
     assert chart.covers("jeans")
     assert chart.covers("shoes")
+    assert chart.covers(ProductType.SWIMWEAR)
+    assert chart.covers(ProductType.OUTERWEAR)
+    assert chart.covers(ProductType.CASUAL_BOTTOMS)
+    assert chart.covers(ProductType.NIGHTWEAR)
+    assert chart.covers(ProductType.BRAS)
+    assert chart.covers(ProductType.SKIRTS)
+    assert chart.covers(ProductType.SHORTS)
+    assert chart.covers(ProductType.HOSIERY)
 
 
 def _sample_override():
