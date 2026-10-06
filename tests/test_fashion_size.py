@@ -12,6 +12,7 @@ import pytest
 
 import fashion_size.charts as charts
 from fashion_size import (
+    PRODUCT_TYPES,
     SUPPORTED_BRANDS,
     ConversionSourceKind,
     DefaultChartReason,
@@ -20,6 +21,7 @@ from fashion_size import (
     __version__,
     register_display_language,
 )
+from fashion_size.product_types import resolve_product_type
 from fashion_size.brands import BRANDS, BrandName
 from fashion_size.charts import (
     BrandConversionChart,
@@ -453,6 +455,13 @@ def test_shipped_brand_charts_are_complete():
     assert dresses is not None and dresses.covers("dresses")
 
 
+def test_swimwear_is_a_product_type():
+    assert ProductType.SWIMWEAR == "swimwear"
+    assert ProductType.SWIMWEAR.label == "Swimwear"
+    assert ProductType.SWIMWEAR in PRODUCT_TYPES
+    assert resolve_product_type(" Swimwear ") is ProductType.SWIMWEAR
+
+
 def test_chart_with_no_product_types_covers_every_product_type():
     chart = BrandConversionChart(
         brand_name=BrandName.ANTHROPOLOGIE,
@@ -467,6 +476,7 @@ def test_chart_with_no_product_types_covers_every_product_type():
     )
     assert chart.covers("jeans")
     assert chart.covers("shoes")
+    assert chart.covers(ProductType.SWIMWEAR)
 
 
 def _sample_override():

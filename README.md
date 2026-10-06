@@ -36,7 +36,7 @@ chart.source_notes
 chart.rows
 ```
 
-`ProductType` is the list of ranges a brand chart can cover on its own (jeans, trousers, shoes, boots, and so on). A chart names the product types it replaces.
+`ProductType` is the list of ranges a brand chart can cover on its own (jeans, trousers, swimwear, shoes, boots, and so on). A chart names the product types it replaces.
 
 Each override chart is a JSON file named by id under `src/fashion_size/fixtures/charts`. The file holds the rows, the source page, and any notes about that table. Which brand it belongs to, the size type and demographic, and when it was last checked live in `fashion_size.brands`. A brand with no charts there matches the default charts.
 

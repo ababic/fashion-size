@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `ProductType.SWIMWEAR` (`"swimwear"`) for brand charts that cover swimwear on their own.
+
 ## 2026.10.5
 
 - Release numbering follows CalVer (`YYYY.M.D`, UTC); see README.
