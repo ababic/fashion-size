@@ -204,9 +204,11 @@ def test_cup_alpha_tokens_convert_with_identity_across_locales():
     women = Demographic("adult", "female")
     alpha = Size.from_raw("small", UK_CUP_SIZE)
     assert alpha.raw == "Small"
-    assert str(alpha) == "Small"
+    assert str(alpha) == "S"
+    assert alpha.display() == "S"
     converted = alpha.convert_to_locale("eu", demographic=women)
     assert converted.raw == "Small"
+    assert converted.display() == "S"
     assert converted.source.kind == ConversionSourceKind.IDENTITY
     assert (
         Size.from_raw("XL", US_CUP_SIZE)

@@ -2,7 +2,7 @@
 
 ## 2026.10.8
 
-- Cup size accepts sports-bra alpha labels (`XXS`, `XS`, `Small`, `Medium`, `Large`, `XL`, `XXL`) with common aliases. They convert identically across UK / EU / US / AU. Single-letter `l` and `m` remain bra cup letters.
+- Cup size accepts sports-bra alpha labels (`XXS`, `XS`, `Small`, `Medium`, `Large`, `XL`, `XXL`) with common aliases. They convert identically across UK / EU / US / AU. Single-letter `l` and `m` remain bra cup letters. Display shortens `Small` / `Medium` / `Large` to `S` / `M` / `L`; `raw` stays canonical.
 
 ## 2026.10.6
 

@@ -172,6 +172,13 @@ CUP_ALPHA_TOKENS: frozenset[str] = frozenset(
     {"XXS", "XS", "Small", "Medium", "Large", "XL", "XXL"}
 )
 
+# Shorter labels for ``Size.display`` / ``localised_display`` only. ``raw`` stays canonical.
+CUP_ALPHA_DISPLAY: dict[str, str] = {
+    "Small": "S",
+    "Medium": "M",
+    "Large": "L",
+}
+
 _CUP_ALPHA_ALIASES: dict[str, str] = {
     "xxs": "XXS",
     "xs": "XS",
@@ -198,6 +205,13 @@ def _cup_alpha_lookup_key(value: str) -> str:
 def is_cup_alpha_token(value: str) -> bool:
     """Whether ``value`` is a canonical alpha cup label (after normalization)."""
     return value in CUP_ALPHA_TOKENS
+
+
+def format_cup_display(value: str) -> str:
+    """Display form for a stored cup or alpha token (``Small`` → ``S``)."""
+    if value in CUP_ALPHA_DISPLAY:
+        return CUP_ALPHA_DISPLAY[value]
+    return value
 
 
 def normalize_cup_token(value: object) -> str:
@@ -1012,13 +1026,19 @@ class Size:
         (``81cm``) and include it otherwise (``81 cm``). Length display rounds
         to the nearest centimetre or half inch; ``raw`` stays exact. Dress and
         shoe sizes keep their UK / EU / US / AU prefix. Cup sizes are the letter
-        alone (``A``, ``DD``), in every language.
+        alone (``A``, ``DD``). Alpha cup labels use short forms (``S``, ``M``, ``L``)
+        while ``raw`` keeps ``Small``, ``Medium``, ``Large``.
         """
         if self.size_unit.length_unit and isinstance(self.raw, Decimal):
             return format_length_for_language(
                 self.raw, self.size_unit.length_unit, locale
             )
         token = self.raw if isinstance(self.raw, str) else format_raw(self.raw)
+        if (
+            self.size_unit.size_type.family == SizeFamily.CUP_SIZE
+            and isinstance(self.raw, str)
+        ):
+            token = format_cup_display(self.raw)
         if self.size_unit.display_prefix:
             return f"{self.size_unit.display_prefix}{token}"
         if self.size_unit.display_suffix:
