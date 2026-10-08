@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- UK, US, and AU waist and chest sizes, and UK, US, and EU band sizes, display as inches or centimetres with the same language rules as length. EU waist and chest labels, AU bands, and French bands keep a region prefix.
+
 ## 2026.10.8
 
 - Cup size accepts sports-bra alpha labels (`XXS`, `XS`, `S`, `MD`, `LG`, `XL`, `XXL`) with common aliases. They convert identically across UK / EU / US / AU. Single-letter `l` and `m` remain bra cup letters. Display shows `MD` / `LG` as `M` / `L`; `raw` stays canonical. `cup_attribute_values` and `cup_sort_key` cover option lists, because alpha labels are not rows on the letter chart.
