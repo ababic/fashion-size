@@ -2,7 +2,9 @@
 
 Each override chart is a JSON file named by UUID. The file holds the conversion
 rows, the source page, and notes about that table. Which brand it belongs to,
-and when it was last checked, are recorded on ``fashion_size.brands.BRANDS``.
+when it was last checked, and when its rows take effect are recorded on
+``fashion_size.brands.BRANDS``. A later chart for the same size type, demographic,
+and product types replaces the earlier one from its own ``effective_from``.
 A brand with no charts matches the defaults.
 """
 
@@ -10,13 +12,19 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from functools import cache
 from pathlib import Path
 from typing import Any
 
-from fashion_size.brands import BRANDS, BrandName, OverrideChart, resolve_brand_name
+from fashion_size.brands import (
+    BRANDS,
+    BrandName,
+    OverrideChart,
+    as_of_moment,
+    resolve_brand_name,
+)
 from fashion_size.demographics import AgeGroup, Gender
 from fashion_size.product_types import (
     PRODUCT_TYPE_SLUGS,
@@ -28,17 +36,25 @@ from fashion_size.size_types import SizeTypeSlug
 
 @dataclass(frozen=True, slots=True)
 class BrandConversionChart:
-    """One brand chart for a size type, age group, gender, and set of product types."""
+    """One brand chart for a size type, age group, gender, and set of product types.
 
+    ``effective_from`` is when these rows start to apply. ``effective_until`` is
+    the next chart's ``effective_from`` for the same size type, demographic, and
+    product types, or none while this chart is the latest.
+    """
+
+    id: str
     brand_name: BrandName
     size_type: str
     age_group: str
     gender: str
     product_types: tuple[ProductType, ...]
     updated_at: datetime
+    effective_from: datetime
     source_url: str
     source_notes: str
     rows: tuple[dict[str, float | int | str], ...]
+    effective_until: datetime | None = None
 
     def covers(self, product_type: ProductType | str) -> bool:
         """Whether this chart replaces the default for ``product_type``.
@@ -81,9 +97,13 @@ def _validate_override(brand_name: str, chart: OverrideChart) -> None:
     ]
     if unknown:
         raise ValueError(f"Unknown product types {unknown!r} on {brand_name!r}.")
-    if chart.updated_at.tzinfo is None:
+    if chart.updated_at.tzinfo is None or chart.updated_at.utcoffset() is None:
         raise ValueError(
             f"Review date for {brand_name!r} chart {chart.id} must include a timezone."
+        )
+    if chart.effective_from.tzinfo is None or chart.effective_from.utcoffset() is None:
+        raise ValueError(
+            f"Effective date for {brand_name!r} chart {chart.id} must include a timezone."
         )
 
 
@@ -142,6 +162,50 @@ def _read_chart_file(path: Path) -> _StoredChart:
     )
 
 
+def _lineage(chart: BrandConversionChart) -> tuple[object, ...]:
+    """Identity of one chart series, ignoring which generation it is."""
+    return (
+        chart.size_type,
+        chart.age_group,
+        chart.gender,
+        tuple(sorted(chart.product_types)),
+    )
+
+
+def _apply_effective_windows(
+    charts: list[BrandConversionChart] | tuple[BrandConversionChart, ...],
+) -> tuple[BrandConversionChart, ...]:
+    """Set each chart's end to the next generation's start.
+
+    Two charts in one series that start at the same instant are an error.
+    Catalog order is preserved.
+    """
+    groups: dict[tuple[object, ...], list[int]] = {}
+    for index, chart in enumerate(charts):
+        groups.setdefault(_lineage(chart), []).append(index)
+    updated = list(charts)
+    for indexes in groups.values():
+        ordered = sorted(indexes, key=lambda index: charts[index].effective_from)
+        starts = [charts[index].effective_from for index in ordered]
+        if len(starts) != len(set(starts)):
+            chart = charts[ordered[0]]
+            gender = chart.gender or "all genders"
+            products = ", ".join(chart.product_types) or "every product type"
+            raise ValueError(
+                f"{chart.brand_name} has two {chart.size_type} charts for "
+                f"{chart.age_group} {gender} ({products}) effective from "
+                f"{starts[0].isoformat()}."
+            )
+        for position, index in enumerate(ordered):
+            until = (
+                charts[ordered[position + 1]].effective_from
+                if position + 1 < len(ordered)
+                else None
+            )
+            updated[index] = replace(charts[index], effective_until=until)
+    return tuple(updated)
+
+
 @cache
 def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
     """``(brand name, charts)`` for every brand in the catalog.
@@ -169,18 +233,20 @@ def _load_brands() -> tuple[tuple[str, tuple[BrandConversionChart, ...]], ...]:
             stored = _read_chart_file(path)
             parsed.append(
                 BrandConversionChart(
+                    id=override.id,
                     brand_name=brand.name,
                     size_type=override.size_type,
                     age_group=override.age_group,
                     gender=override.gender,
                     product_types=override.product_types,
                     updated_at=override.updated_at,
+                    effective_from=override.effective_from,
                     source_url=stored.source_url,
                     source_notes=stored.source_notes,
                     rows=stored.rows,
                 )
             )
-        loaded.append((brand.name, tuple(parsed)))
+        loaded.append((brand.name, _apply_effective_windows(parsed)))
     orphans = sorted(set(files) - seen_ids)
     if orphans:
         raise ValueError(
@@ -208,21 +274,34 @@ def charts_for_brand(brand_name: BrandName | str) -> tuple[BrandConversionChart,
     return tuple(chart for chart in load_brand_charts() if chart.brand_name == known)
 
 
+def _chart_in_force(chart: BrandConversionChart, moment: datetime) -> bool:
+    """Whether ``moment`` falls in ``[effective_from, effective_until)``."""
+    if moment < chart.effective_from:
+        return False
+    return chart.effective_until is None or moment < chart.effective_until
+
+
 def chart_for(
     brand_name: BrandName | str,
     size_type: str,
     age_group: str,
     gender: str,
     product_type: ProductType | str | None = None,
+    *,
+    as_of: datetime | None = None,
 ) -> BrandConversionChart | None:
     """Pick a brand chart for this size type, demographic, and optional product type.
 
-    A chart that lists ``product_type`` wins over a chart with no product types
-    (one chart for every product type). When ``product_type`` is omitted, a chart
-    for that size type and demographic is returned only when there is exactly one.
-    A male or female chart wins over a chart with a blank gender (the shared chart
-    for that age group).
+    ``as_of`` is when the raw size was captured. Omit it to use the chart in force
+    now. A chart applies from ``effective_from`` until the next chart in the same
+    series. Product-type and gender rules run inside that instant: a chart that
+    lists ``product_type`` wins over a chart with no product types (one chart for
+    every product type). When ``product_type`` is omitted, a chart for that size
+    type and demographic is returned only when there is exactly one. A male or
+    female chart wins over a chart with a blank gender (the shared chart for that
+    age group).
     """
+    moment = as_of_moment(as_of)
     age = age_group.strip().lower()
     sex = gender.strip().lower()
     size_type_slug = size_type.strip().lower()
@@ -236,6 +315,7 @@ def chart_for(
         if chart.size_type == size_type_slug
         and chart.age_group == age
         and chart.gender in {sex, ""}
+        and _chart_in_force(chart, moment)
     ]
     if product_type:
         explicit = [

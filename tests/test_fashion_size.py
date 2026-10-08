@@ -24,6 +24,7 @@ from fashion_size import (
 from fashion_size.brands import BRANDS, BrandName
 from fashion_size.charts import (
     BrandConversionChart,
+    _apply_effective_windows,
     _parse_rows,
     _read_chart_file,
     _validate_override,
@@ -32,7 +33,14 @@ from fashion_size.charts import (
     load_brand_charts,
 )
 from fashion_size.product_types import PRODUCT_TYPE_SLUGS, resolve_product_type
-from fashion_size.scales import cup_attribute_values, cup_sort_key, default_scale
+from fashion_size.scales import (
+    DEFAULT_SCALE_EPOCH,
+    DEFAULT_SCALES,
+    _seal,
+    cup_attribute_values,
+    cup_sort_key,
+    default_scale,
+)
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
     AU_BAND_SIZE,
@@ -81,6 +89,8 @@ def test_readme_brand_chart_example():
     )
     assert chart is not None
     assert chart.updated_at == datetime(2026, 3, 29, tzinfo=UTC)
+    assert chart.effective_from == datetime(2026, 3, 29, tzinfo=UTC)
+    assert chart.effective_until is None
     assert chart.source_url == "https://www.dunelondon.com/size-guide"
     assert chart.source_notes == ""
     mens = chart_for(
@@ -520,8 +530,11 @@ def test_shipped_brand_charts_are_complete():
             chart.age_group,
             gender,
             product_type=product_type,
+            as_of=chart.effective_from,
         )
         assert found is chart
+        assert chart.effective_until is None
+        assert chart.id
 
     kids = chart_for(
         "Salt-Water Sandals",
@@ -582,12 +595,14 @@ def test_suit_jackets_resolves_to_suits():
 
 def test_chart_with_no_product_types_covers_every_product_type():
     chart = BrandConversionChart(
+        id="00000000-0000-4000-8000-000000000001",
         brand_name=BrandName.ANTHROPOLOGIE,
         size_type="dress",
         age_group="adult",
         gender="female",
         product_types=(),
         updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+        effective_from=datetime(2026, 3, 29, tzinfo=UTC),
         source_url="",
         source_notes="",
         rows=({"uk": 10, "eu": 38, "us": 6, "au": 10},),
@@ -630,6 +645,7 @@ def test_chart_rows_are_rejected_when_incomplete(rows, match):
         ({"product_types": ("not-a-family",)}, "product types"),
         ({"id": "not-a-uuid"}, "not a UUID"),
         ({"updated_at": datetime(2026, 3, 29)}, "timezone"),
+        ({"effective_from": datetime(2026, 3, 29)}, "timezone"),
     ],
 )
 def test_override_metadata_is_rejected_when_incomplete(changes, match):
@@ -701,3 +717,180 @@ def test_chart_file_requires_source_and_rows(tmp_path: Path):
     )
     with pytest.raises(ValueError, match="source_notes"):
         _read_chart_file(path)
+
+
+def _shoe_chart(**changes) -> BrandConversionChart:
+    fields: dict[str, object] = {
+        "id": "00000000-0000-4000-8000-000000000010",
+        "brand_name": BrandName.DUNE_LONDON,
+        "size_type": "adult-shoe",
+        "age_group": "adult",
+        "gender": "female",
+        "product_types": (ProductType.SHOES,),
+        "updated_at": datetime(2026, 3, 29, tzinfo=UTC),
+        "effective_from": datetime(2026, 3, 29, tzinfo=UTC),
+        "source_url": "https://example.test/sizes",
+        "source_notes": "",
+        "rows": ({"uk": 7, "eu": 40, "us": 9, "au": 9},),
+    }
+    fields.update(changes)
+    return BrandConversionChart(**fields)
+
+
+def test_as_of_selects_the_brand_chart_generation(monkeypatch):
+    early = _shoe_chart(
+        id="00000000-0000-4000-8000-000000000011",
+        effective_from=datetime(2020, 1, 1, tzinfo=UTC),
+        rows=({"uk": 7, "eu": 41, "us": 9, "au": 9},),
+    )
+    late = _shoe_chart()
+    sealed = _apply_effective_windows((early, late))
+    monkeypatch.setattr(charts, "charts_for_brand", lambda brand_name: sealed)
+    assert (
+        chart_for(
+            "Dune London",
+            "adult-shoe",
+            "adult",
+            "female",
+            product_type=ProductType.SHOES,
+            as_of=datetime(2024, 6, 1, tzinfo=UTC),
+        )
+        is sealed[0]
+    )
+    assert (
+        chart_for(
+            "Dune London",
+            "adult-shoe",
+            "adult",
+            "female",
+            product_type=ProductType.SHOES,
+            as_of=datetime(2026, 3, 29, tzinfo=UTC),
+        )
+        is sealed[1]
+    )
+    assert (
+        chart_for(
+            "Dune London",
+            "adult-shoe",
+            "adult",
+            "female",
+            product_type=ProductType.SHOES,
+            as_of=datetime(2019, 12, 31, tzinfo=UTC),
+        )
+        is None
+    )
+    with pytest.raises(ValueError, match="effective from"):
+        _apply_effective_windows(
+            (early, replace(late, effective_from=early.effective_from))
+        )
+
+
+def test_product_type_rules_apply_inside_the_chart_window(monkeypatch):
+    shared = _shoe_chart(
+        id="00000000-0000-4000-8000-000000000012",
+        product_types=(),
+        effective_from=datetime(2020, 1, 1, tzinfo=UTC),
+        rows=({"uk": 7, "eu": 41, "us": 9, "au": 9},),
+    )
+    shoes = _shoe_chart(effective_from=datetime(2026, 1, 1, tzinfo=UTC))
+    monkeypatch.setattr(charts, "charts_for_brand", lambda brand_name: (shared, shoes))
+    assert (
+        chart_for(
+            "Dune London",
+            "adult-shoe",
+            "adult",
+            "female",
+            product_type=ProductType.SHOES,
+            as_of=datetime(2024, 1, 1, tzinfo=UTC),
+        )
+        is shared
+    )
+    assert (
+        chart_for(
+            "Dune London",
+            "adult-shoe",
+            "adult",
+            "female",
+            product_type=ProductType.SHOES,
+            as_of=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+        is shoes
+    )
+
+
+def test_conversion_uses_the_chart_in_force_when_the_size_was_captured():
+    adult_female = Demographic("adult", "female")
+    shoe = Size.from_raw(7, UK_ADULT_SHOE_SIZE)
+    captured_before = datetime(2026, 3, 28, tzinfo=UTC)
+    captured_on = datetime(2026, 3, 29, tzinfo=UTC)
+    before = shoe.convert_to_locale(
+        "eu",
+        demographic=adult_female,
+        brand_name="Dune London",
+        product_type=ProductType.SHOES,
+        as_of=captured_before,
+    )
+    on_chart = shoe.convert_to_locale(
+        "eu",
+        demographic=adult_female,
+        brand_name="Dune London",
+        product_type=ProductType.SHOES,
+        as_of=captured_on,
+    )
+    current = shoe.convert_to_locale(
+        "eu",
+        demographic=adult_female,
+        brand_name="Dune London",
+        product_type=ProductType.SHOES,
+    )
+    assert before.raw == 41
+    assert before.source.default_reason == DefaultChartReason.NO_MATCHING_CHART
+    assert on_chart.raw == 40
+    assert on_chart.source.kind == ConversionSourceKind.BRAND
+    assert on_chart.source.brand_chart is not None
+    assert on_chart.source.brand_chart.effective_from == captured_on
+    assert current.raw == on_chart.raw
+    assert current.source.brand_chart is not None
+    assert current.source.brand_chart.id == on_chart.source.brand_chart.id
+    with pytest.raises(ValueError, match="timezone"):
+        shoe.convert_to_locale(
+            "eu",
+            demographic=adult_female,
+            brand_name="Dune London",
+            product_type=ProductType.SHOES,
+            as_of=datetime(2026, 3, 29),
+        )
+
+
+def test_shipped_default_charts_cover_earlier_capture_times():
+    women = Demographic("adult", "female")
+    early = Size.from_raw(10, UK_DRESS_SIZE).convert_to_locale(
+        "eu", demographic=women, as_of=datetime(1990, 1, 1, tzinfo=UTC)
+    )
+    current = Size.from_raw(10, UK_DRESS_SIZE).convert_to_locale(
+        "eu", demographic=women
+    )
+    assert early.raw == current.raw == 38
+    assert early.source.default_scale is not None
+    assert early.source.default_scale.effective_from == DEFAULT_SCALE_EPOCH
+
+
+def test_default_scale_follows_effective_windows(monkeypatch):
+    key = ("dress", "adult", "female")
+    current = DEFAULT_SCALES[key][0]
+    revised_from = datetime(2030, 1, 1, tzinfo=UTC)
+    old, new = _seal(
+        replace(current, effective_from=DEFAULT_SCALE_EPOCH),
+        replace(current, effective_from=revised_from, rows=current.rows[:1]),
+    )
+    monkeypatch.setitem(DEFAULT_SCALES, key, (old, new))
+    size_type = UK_DRESS_SIZE.size_type
+    assert (
+        default_scale(size_type, "adult", "female", as_of=datetime(2020, 1, 1, tzinfo=UTC))
+        is old
+    )
+    assert default_scale(size_type, "adult", "female", as_of=revised_from) is new
+    with pytest.raises(ValueError, match="timezone"):
+        default_scale(size_type, "adult", "female", as_of=datetime(2020, 1, 1))
+    with pytest.raises(ValueError, match="effective_from"):
+        _seal(current, replace(current, rows=current.rows[:1]))

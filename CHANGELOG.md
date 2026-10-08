@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Brand and default conversion charts keep earlier generations. `effective_from` is when a chart's rows start to apply. `effective_until` is the next chart's start for the same size type, demographic, and product types. `chart_for`, `Size.convert`, and `Size.convert_to_locale` take optional `as_of`, the instant the raw size was captured. Omit it to use the chart in force now. A capture time before a brand's first override uses the default chart. Loaded brand charts include their catalog `id`.
+
 ## 2026.10.8.1
 
 - UK, US, and AU waist and chest sizes, and UK, US, and EU band sizes, display as inches or centimetres with the same language rules as length. EU waist and chest labels, AU bands, and French bands keep a region prefix.
