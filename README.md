@@ -104,7 +104,7 @@ Releases use [calendar versioning](https://calver.org/): `YYYY.M.D` (UTC date wh
 
 For a second release on the same UTC day, bump the micro segment: `2026.10.5.1` and tag `v2026.10.5.1` (or use `.post1` if you prefer PEP 440 post-releases).
 
-Before tagging, bump `src/fashion_size/__version__.py`, update `CHANGELOG.md`, commit, then push the tag. The workflow runs tests, checks that the tag matches the package version, builds wheels, creates a GitHub release, and publishes to PyPI.
+Before tagging, bump `src/fashion_size/__version__.py`, update `CHANGELOG.md`, commit, then push the tag. The tagged commit must be on `main` or a branch named `release-*`. The workflow runs tests, checks that the tag matches the package version, builds wheels, creates a GitHub release, and publishes to PyPI. A tag whose commit is not on one of those branches fails before anything is published.
 
 ## License
 

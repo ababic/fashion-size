@@ -1,5 +1,7 @@
 name: Release
 
+# A tag push does not name a branch. The branch job rejects a tag whose commit
+# is not on main or a release-* branch, before tests or publishing run.
 on:
   push:
     tags:
@@ -9,8 +11,28 @@ permissions:
   contents: write
 
 jobs:
+  branch:
+    name: Branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require main or a release branch
+        run: |
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+          commit="$(git rev-parse 'HEAD^{commit}')"
+          if ! git branch -r --contains "$commit" | sed 's/^[* ]*//' | grep -Eq '^(origin/main|origin/release-[^/]*)$'; then
+            echo "Tag ${GITHUB_REF_NAME} points at ${commit}, which is not on main or a release-* branch."
+            git branch -r --contains "$commit" || true
+            exit 1
+          fi
+
   test:
     name: Test
+    needs: branch
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

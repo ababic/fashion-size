@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Brand and default conversion charts keep earlier generations. `effective_from` is when a chart's rows start to apply. `effective_until` is the next chart's start for the same size type, demographic, and product types. `chart_for`, `Size.convert`, and `Size.convert_to_locale` take optional `as_of`, the instant the raw size was captured. Omit it to use the chart in force now. A capture time before a brand's first override uses the default chart. Loaded brand charts include their catalog `id`.
+- The release workflow publishes a `v*` tag only when that commit is on `main` or a `release-*` branch.
 
 ## 2026.10.8.1
 
