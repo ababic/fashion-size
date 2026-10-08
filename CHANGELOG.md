@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Cup size accepts sports-bra alpha labels (`XXS`, `XS`, `Small`, `Medium`, `Large`, `XL`, `XXL`) with common aliases. They convert identically across UK / EU / US / AU. Single-letter `l` and `m` remain bra cup letters.
+
 ## 2026.10.6
 
 - `ProductType.SWIMWEAR`, `OUTERWEAR`, `CASUAL_BOTTOMS`, `NIGHTWEAR`, `BRAS`, `SKIRTS`, `SHORTS`, and `HOSIERY` (tights, stockings, and socks) for brand charts that cover those ranges on their own.

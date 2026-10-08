@@ -165,13 +165,60 @@ CUP_TOKENS: frozenset[str] = frozenset(
     }
 )
 
+# Sports-bra and bralette alpha labels (not regional cup letters). Stored verbatim;
+# locale conversion is identity. ``Small`` / ``Medium`` / ``Large`` avoid clashing
+# with cup ``L`` and ``M``. Bare ``l`` / ``m`` still mean cup letters.
+CUP_ALPHA_TOKENS: frozenset[str] = frozenset(
+    {"XXS", "XS", "Small", "Medium", "Large", "XL", "XXL"}
+)
+
+_CUP_ALPHA_ALIASES: dict[str, str] = {
+    "xxs": "XXS",
+    "xs": "XS",
+    "xsmall": "XS",
+    "extrasmall": "XS",
+    "s": "Small",
+    "sm": "Small",
+    "small": "Small",
+    "medium": "Medium",
+    "med": "Medium",
+    "large": "Large",
+    "lg": "Large",
+    "xl": "XL",
+    "xlarge": "XL",
+    "xxl": "XXL",
+    "2xl": "XXL",
+}
+
+
+def _cup_alpha_lookup_key(value: str) -> str:
+    return value.strip().lower().replace(" ", "").replace("-", "")
+
+
+def is_cup_alpha_token(value: str) -> bool:
+    """Whether ``value`` is a canonical alpha cup label (after normalization)."""
+    return value in CUP_ALPHA_TOKENS
+
 
 def normalize_cup_token(value: object) -> str:
-    """Canonical cup-size letter (``dd`` → ``DD``). Rejects ranges and unknown letters."""
-    token = str(value or "").strip().upper().replace(" ", "")
-    if token not in CUP_TOKENS:
+    """Canonical cup letter (``dd`` → ``DD``) or alpha label (``small`` → ``Small``).
+
+    Alpha labels convert identically across UK / EU / US / AU. Single-letter ``l``
+    and ``m`` are cup letters, not ``Large`` / ``Medium`` — use the full words or
+    ``lg`` / ``med`` for alpha.
+    """
+    text = str(value or "").strip()
+    if not text:
         raise ValueError(f"Unknown cup size {value!r}.")
-    return token
+    if text in CUP_ALPHA_TOKENS:
+        return text
+    alpha = _CUP_ALPHA_ALIASES.get(_cup_alpha_lookup_key(text))
+    if alpha is not None:
+        return alpha
+    token = text.upper().replace(" ", "")
+    if token in CUP_TOKENS:
+        return token
+    raise ValueError(f"Unknown cup size {value!r}.")
 
 
 def format_raw(value: int | float | str | Decimal) -> str:
@@ -915,6 +962,10 @@ class ConversionScale:
         source: SizeUnit,
         target: SizeUnit,
     ) -> Decimal | str:
+        if self.size_type.family == SizeFamily.CUP_SIZE:
+            token = normalize_cup_token(raw)
+            if is_cup_alpha_token(token):
+                return token
         if source == target:
             if self.size_type.family == SizeFamily.CUP_SIZE:
                 return normalize_cup_token(raw)

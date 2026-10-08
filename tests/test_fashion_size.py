@@ -37,6 +37,7 @@ from fashion_size.types import (
     CM_CHEST_SIZE,
     EU_ADULT_SHOE_SIZE,
     EU_BAND_SIZE,
+    EU_CUP_SIZE,
     EU_DRESS_SIZE,
     FR_BAND_SIZE,
     INCH_CHEST_SIZE,
@@ -48,6 +49,7 @@ from fashion_size.types import (
     UK_DRESS_SIZE,
     UK_KIDS_SHOE_SIZE,
     UK_WAIST_SIZE,
+    US_CUP_SIZE,
     IncompatibleSizeError,
     LengthOutOfRangeError,
     MissingScaleError,
@@ -198,6 +200,36 @@ def test_locale_charts():
     )
 
 
+def test_cup_alpha_tokens_convert_with_identity_across_locales():
+    women = Demographic("adult", "female")
+    alpha = Size.from_raw("small", UK_CUP_SIZE)
+    assert alpha.raw == "Small"
+    assert str(alpha) == "Small"
+    converted = alpha.convert_to_locale("eu", demographic=women)
+    assert converted.raw == "Small"
+    assert converted.source.kind == ConversionSourceKind.IDENTITY
+    assert (
+        Size.from_raw("XL", US_CUP_SIZE)
+        .convert_to_locale("uk", demographic=women)
+        .raw
+        == "XL"
+    )
+    assert Size.from_raw("med", UK_CUP_SIZE).raw == "Medium"
+    assert Size.from_raw("lg", UK_CUP_SIZE).raw == "Large"
+    assert (
+        Size.from_raw("HH", UK_CUP_SIZE)
+        .convert_to_locale("eu", demographic=women)
+        .raw
+        == "L"
+    )
+    assert (
+        Size.from_raw("M", EU_CUP_SIZE)
+        .convert_to_locale("us", demographic=women)
+        .raw
+        == "M"
+    )
+
+
 def test_length_conversion_and_display():
     inches = Size.from_raw(32, INCH_CHEST_SIZE)
     centimetres = inches.convert("cm", demographic=Demographic("adult", "unisex"))
@@ -314,6 +346,8 @@ def test_attribute_options_and_size_unit_slugs():
     assert chest is not None and chest.raw == 32 and chest.size_unit is INCH_CHEST_SIZE
     cup = size_from_attribute_option("uk-cup-size", "dd")
     assert cup is not None and cup.raw == "DD"
+    alpha_cup = size_from_attribute_option("uk-cup-size", "x-large")
+    assert alpha_cup is not None and alpha_cup.raw == "XL"
     assert size_from_attribute_option("uk-dress-size", "small") is None
     assert size_from_attribute_option("not-a-size", "10") is None
 
