@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2026.10.8.1
 
 - UK, US, and AU waist and chest sizes, and UK, US, and EU band sizes, display as inches or centimetres with the same language rules as length. EU waist and chest labels, AU bands, and French bands keep a region prefix.
 
