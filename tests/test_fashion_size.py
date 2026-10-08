@@ -204,11 +204,11 @@ def test_locale_charts():
 def test_cup_alpha_tokens_convert_with_identity_across_locales():
     women = Demographic("adult", "female")
     alpha = Size.from_raw("small", UK_CUP_SIZE)
-    assert alpha.raw == "Small"
+    assert alpha.raw == "S"
     assert str(alpha) == "S"
     assert alpha.display() == "S"
     converted = alpha.convert_to_locale("eu", demographic=women)
-    assert converted.raw == "Small"
+    assert converted.raw == "S"
     assert converted.display() == "S"
     assert converted.source.kind == ConversionSourceKind.IDENTITY
     assert (
@@ -217,8 +217,10 @@ def test_cup_alpha_tokens_convert_with_identity_across_locales():
         .raw
         == "XL"
     )
-    assert Size.from_raw("med", UK_CUP_SIZE).raw == "Medium"
-    assert Size.from_raw("lg", UK_CUP_SIZE).raw == "Large"
+    assert Size.from_raw("med", UK_CUP_SIZE).raw == "MD"
+    assert Size.from_raw("medium", UK_CUP_SIZE).display() == "M"
+    assert Size.from_raw("lg", UK_CUP_SIZE).raw == "LG"
+    assert Size.from_raw("large", UK_CUP_SIZE).display() == "L"
     assert (
         Size.from_raw("HH", UK_CUP_SIZE)
         .convert_to_locale("eu", demographic=women)
@@ -231,23 +233,23 @@ def test_cup_alpha_tokens_convert_with_identity_across_locales():
         .raw
         == "M"
     )
-    # Short display of Medium/Large is not safe to store and parse again.
-    assert Size.from_raw("Medium", UK_CUP_SIZE).display() == "M"
+    # Short display of MD/LG is not safe to store and parse again.
+    assert Size.from_raw("MD", UK_CUP_SIZE).display() == "M"
     assert Size.from_raw("M", UK_CUP_SIZE).raw == "M"
     values = cup_attribute_values(UK_CUP_SIZE)
     assert values[:2] == ("AA", "A")
-    assert values[-7:] == ("XXS", "XS", "Small", "Medium", "Large", "XL", "XXL")
-    assert "Small" not in default_scale(
+    assert values[-7:] == ("XXS", "XS", "S", "MD", "LG", "XL", "XXL")
+    assert "MD" not in default_scale(
         UK_CUP_SIZE.size_type, "adult", "female"
     ).raw_values(UK_CUP_SIZE)
-    assert sorted(["Large", "DD", "XXS", "XL"], key=cup_sort_key) == [
+    assert sorted(["LG", "DD", "XXS", "XL"], key=cup_sort_key) == [
         "DD",
         "XXS",
-        "Large",
+        "LG",
         "XL",
     ]
     assert cup_sort_key("HH") == cup_sort_key("L")
-    assert cup_sort_key("XS") < cup_sort_key("Small")
+    assert cup_sort_key("XS") < cup_sort_key("S")
 
 
 def test_length_conversion_and_display():

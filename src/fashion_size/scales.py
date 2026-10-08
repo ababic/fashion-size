@@ -349,7 +349,7 @@ def cup_attribute_values(size_unit: SizeUnit) -> tuple[str, ...]:
     """Letter-chart values for ``size_unit``, then alpha labels in size order.
 
     ``ConversionScale.raw_values`` is the regional letter chart only. Alpha labels
-    (``Small``, ``XL``, …) are valid cup sizes and are not rows on that chart.
+    (``S``, ``MD``, ``LG``, ``XL``, …) are valid cup sizes and are not rows on that chart.
     """
     if size_unit.size_type.family is not SizeFamily.CUP_SIZE:
         raise ValueError(f"{size_unit.label} is not a cup size.")
@@ -366,7 +366,7 @@ def cup_sort_key(value: str) -> tuple[int, int]:
 
     Letters follow the default chart (values on the same row share a rank).
     Alpha labels follow, from ``XXS`` through ``XXL``. Persist ``raw``, not the
-    short display: ``M`` and ``L`` are cup letters, not ``Medium`` and ``Large``.
+    short display: ``M`` and ``L`` are cup letters, not ``MD`` and ``LG``.
     """
     token = normalize_cup_token(value)
     if is_cup_alpha_token(token):

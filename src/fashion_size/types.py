@@ -166,25 +166,16 @@ CUP_TOKENS: frozenset[str] = frozenset(
 )
 
 # Sports-bra and bralette alpha labels (not regional cup letters). Stored verbatim
-# in this order; locale conversion is identity. ``Small`` / ``Medium`` / ``Large``
-# avoid clashing with cup ``L`` and ``M``. Bare ``l`` / ``m`` still mean cup letters.
+# in this order; locale conversion is identity. ``MD`` / ``LG`` avoid clashing with
+# cup ``M`` and ``L``. Bare ``m`` / ``l`` still mean cup letters.
 # These are not rows on the letter chart — append this tuple when building option lists.
-CUP_ALPHA_ORDER: tuple[str, ...] = (
-    "XXS",
-    "XS",
-    "Small",
-    "Medium",
-    "Large",
-    "XL",
-    "XXL",
-)
+CUP_ALPHA_ORDER: tuple[str, ...] = ("XXS", "XS", "S", "MD", "LG", "XL", "XXL")
 CUP_ALPHA_TOKENS: frozenset[str] = frozenset(CUP_ALPHA_ORDER)
 
-# Shorter labels for ``Size.display`` / ``localised_display`` only. ``raw`` stays canonical.
+# Shop labels for ``Size.display`` / ``localised_display`` only. ``raw`` stays canonical.
 CUP_ALPHA_DISPLAY: dict[str, str] = {
-    "Small": "S",
-    "Medium": "M",
-    "Large": "L",
+    "MD": "M",
+    "LG": "L",
 }
 
 _CUP_ALPHA_ALIASES: dict[str, str] = {
@@ -192,13 +183,14 @@ _CUP_ALPHA_ALIASES: dict[str, str] = {
     "xs": "XS",
     "xsmall": "XS",
     "extrasmall": "XS",
-    "s": "Small",
-    "sm": "Small",
-    "small": "Small",
-    "medium": "Medium",
-    "med": "Medium",
-    "large": "Large",
-    "lg": "Large",
+    "s": "S",
+    "sm": "S",
+    "small": "S",
+    "md": "MD",
+    "med": "MD",
+    "medium": "MD",
+    "lg": "LG",
+    "large": "LG",
     "xl": "XL",
     "xlarge": "XL",
     "xxl": "XXL",
@@ -216,18 +208,17 @@ def is_cup_alpha_token(value: str) -> bool:
 
 
 def format_cup_display(value: str) -> str:
-    """Display form for a stored cup or alpha token (``Small`` → ``S``)."""
+    """Display form for a stored cup or alpha token (``MD`` → ``M``, ``LG`` → ``L``)."""
     if value in CUP_ALPHA_DISPLAY:
         return CUP_ALPHA_DISPLAY[value]
     return value
 
 
 def normalize_cup_token(value: object) -> str:
-    """Canonical cup letter (``dd`` → ``DD``) or alpha label (``small`` → ``Small``).
+    """Canonical cup letter (``dd`` → ``DD``) or alpha label (``medium`` → ``MD``).
 
     Alpha labels convert identically across UK / EU / US / AU. Single-letter ``l``
-    and ``m`` are cup letters, not ``Large`` / ``Medium`` — use the full words or
-    ``lg`` / ``med`` for alpha.
+    and ``m`` are cup letters, not ``LG`` / ``MD``.
     """
     text = str(value or "").strip()
     if not text:
@@ -1034,9 +1025,9 @@ class Size:
         (``81cm``) and include it otherwise (``81 cm``). Length display rounds
         to the nearest centimetre or half inch; ``raw`` stays exact. Dress and
         shoe sizes keep their UK / EU / US / AU prefix. Cup sizes are the letter
-        alone (``A``, ``DD``). Alpha cup labels use short forms (``S``, ``M``, ``L``)
-        while ``raw`` keeps ``Small``, ``Medium``, ``Large``. Persist ``raw``:
-        parsing ``M`` or ``L`` reads them as cup letters.
+        alone (``A``, ``DD``). Alpha ``MD`` / ``LG`` display as ``M`` / ``L``;
+        ``raw`` stays ``MD`` / ``LG``. Persist ``raw``: parsing ``M`` or ``L``
+        reads them as cup letters.
         """
         if self.size_unit.length_unit and isinstance(self.raw, Decimal):
             return format_length_for_language(
