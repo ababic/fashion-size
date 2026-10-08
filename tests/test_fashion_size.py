@@ -32,6 +32,7 @@ from fashion_size.charts import (
     load_brand_charts,
 )
 from fashion_size.product_types import PRODUCT_TYPE_SLUGS, resolve_product_type
+from fashion_size.scales import cup_attribute_values, cup_sort_key, default_scale
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
     CM_CHEST_SIZE,
@@ -230,6 +231,23 @@ def test_cup_alpha_tokens_convert_with_identity_across_locales():
         .raw
         == "M"
     )
+    # Short display of Medium/Large is not safe to store and parse again.
+    assert Size.from_raw("Medium", UK_CUP_SIZE).display() == "M"
+    assert Size.from_raw("M", UK_CUP_SIZE).raw == "M"
+    values = cup_attribute_values(UK_CUP_SIZE)
+    assert values[:2] == ("AA", "A")
+    assert values[-7:] == ("XXS", "XS", "Small", "Medium", "Large", "XL", "XXL")
+    assert "Small" not in default_scale(
+        UK_CUP_SIZE.size_type, "adult", "female"
+    ).raw_values(UK_CUP_SIZE)
+    assert sorted(["Large", "DD", "XXS", "XL"], key=cup_sort_key) == [
+        "DD",
+        "XXS",
+        "Large",
+        "XL",
+    ]
+    assert cup_sort_key("HH") == cup_sort_key("L")
+    assert cup_sort_key("XS") < cup_sort_key("Small")
 
 
 def test_length_conversion_and_display():

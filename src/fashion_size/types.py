@@ -165,12 +165,20 @@ CUP_TOKENS: frozenset[str] = frozenset(
     }
 )
 
-# Sports-bra and bralette alpha labels (not regional cup letters). Stored verbatim;
-# locale conversion is identity. ``Small`` / ``Medium`` / ``Large`` avoid clashing
-# with cup ``L`` and ``M``. Bare ``l`` / ``m`` still mean cup letters.
-CUP_ALPHA_TOKENS: frozenset[str] = frozenset(
-    {"XXS", "XS", "Small", "Medium", "Large", "XL", "XXL"}
+# Sports-bra and bralette alpha labels (not regional cup letters). Stored verbatim
+# in this order; locale conversion is identity. ``Small`` / ``Medium`` / ``Large``
+# avoid clashing with cup ``L`` and ``M``. Bare ``l`` / ``m`` still mean cup letters.
+# These are not rows on the letter chart — append this tuple when building option lists.
+CUP_ALPHA_ORDER: tuple[str, ...] = (
+    "XXS",
+    "XS",
+    "Small",
+    "Medium",
+    "Large",
+    "XL",
+    "XXL",
 )
+CUP_ALPHA_TOKENS: frozenset[str] = frozenset(CUP_ALPHA_ORDER)
 
 # Shorter labels for ``Size.display`` / ``localised_display`` only. ``raw`` stays canonical.
 CUP_ALPHA_DISPLAY: dict[str, str] = {
@@ -1027,7 +1035,8 @@ class Size:
         to the nearest centimetre or half inch; ``raw`` stays exact. Dress and
         shoe sizes keep their UK / EU / US / AU prefix. Cup sizes are the letter
         alone (``A``, ``DD``). Alpha cup labels use short forms (``S``, ``M``, ``L``)
-        while ``raw`` keeps ``Small``, ``Medium``, ``Large``.
+        while ``raw`` keeps ``Small``, ``Medium``, ``Large``. Persist ``raw``:
+        parsing ``M`` or ``L`` reads them as cup letters.
         """
         if self.size_unit.length_unit and isinstance(self.raw, Decimal):
             return format_length_for_language(
