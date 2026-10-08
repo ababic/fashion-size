@@ -165,13 +165,73 @@ CUP_TOKENS: frozenset[str] = frozenset(
     }
 )
 
+# Sports-bra and bralette alpha labels (not regional cup letters). Stored verbatim
+# in this order; locale conversion is identity. ``MD`` / ``LG`` avoid clashing with
+# cup ``M`` and ``L``. Bare ``m`` / ``l`` still mean cup letters.
+# These are not rows on the letter chart — append this tuple when building option lists.
+CUP_ALPHA_ORDER: tuple[str, ...] = ("XXS", "XS", "S", "MD", "LG", "XL", "XXL")
+CUP_ALPHA_TOKENS: frozenset[str] = frozenset(CUP_ALPHA_ORDER)
+
+# Shop labels for ``Size.display`` / ``localised_display`` only. ``raw`` stays canonical.
+CUP_ALPHA_DISPLAY: dict[str, str] = {
+    "MD": "M",
+    "LG": "L",
+}
+
+_CUP_ALPHA_ALIASES: dict[str, str] = {
+    "xxs": "XXS",
+    "xs": "XS",
+    "xsmall": "XS",
+    "extrasmall": "XS",
+    "s": "S",
+    "sm": "S",
+    "small": "S",
+    "md": "MD",
+    "med": "MD",
+    "medium": "MD",
+    "lg": "LG",
+    "large": "LG",
+    "xl": "XL",
+    "xlarge": "XL",
+    "xxl": "XXL",
+    "2xl": "XXL",
+}
+
+
+def _cup_alpha_lookup_key(value: str) -> str:
+    return value.strip().lower().replace(" ", "").replace("-", "")
+
+
+def is_cup_alpha_token(value: str) -> bool:
+    """Whether ``value`` is a canonical alpha cup label (after normalization)."""
+    return value in CUP_ALPHA_TOKENS
+
+
+def format_cup_display(value: str) -> str:
+    """Display form for a stored cup or alpha token (``MD`` → ``M``, ``LG`` → ``L``)."""
+    if value in CUP_ALPHA_DISPLAY:
+        return CUP_ALPHA_DISPLAY[value]
+    return value
+
 
 def normalize_cup_token(value: object) -> str:
-    """Canonical cup-size letter (``dd`` → ``DD``). Rejects ranges and unknown letters."""
-    token = str(value or "").strip().upper().replace(" ", "")
-    if token not in CUP_TOKENS:
+    """Canonical cup letter (``dd`` → ``DD``) or alpha label (``medium`` → ``MD``).
+
+    Alpha labels convert identically across UK / EU / US / AU. Single-letter ``l``
+    and ``m`` are cup letters, not ``LG`` / ``MD``.
+    """
+    text = str(value or "").strip()
+    if not text:
         raise ValueError(f"Unknown cup size {value!r}.")
-    return token
+    if text in CUP_ALPHA_TOKENS:
+        return text
+    alpha = _CUP_ALPHA_ALIASES.get(_cup_alpha_lookup_key(text))
+    if alpha is not None:
+        return alpha
+    token = text.upper().replace(" ", "")
+    if token in CUP_TOKENS:
+        return token
+    raise ValueError(f"Unknown cup size {value!r}.")
 
 
 def format_raw(value: int | float | str | Decimal) -> str:
@@ -915,6 +975,10 @@ class ConversionScale:
         source: SizeUnit,
         target: SizeUnit,
     ) -> Decimal | str:
+        if self.size_type.family == SizeFamily.CUP_SIZE:
+            token = normalize_cup_token(raw)
+            if is_cup_alpha_token(token):
+                return token
         if source == target:
             if self.size_type.family == SizeFamily.CUP_SIZE:
                 return normalize_cup_token(raw)
@@ -961,13 +1025,20 @@ class Size:
         (``81cm``) and include it otherwise (``81 cm``). Length display rounds
         to the nearest centimetre or half inch; ``raw`` stays exact. Dress and
         shoe sizes keep their UK / EU / US / AU prefix. Cup sizes are the letter
-        alone (``A``, ``DD``), in every language.
+        alone (``A``, ``DD``). Alpha ``MD`` / ``LG`` display as ``M`` / ``L``;
+        ``raw`` stays ``MD`` / ``LG``. Persist ``raw``: parsing ``M`` or ``L``
+        reads them as cup letters.
         """
         if self.size_unit.length_unit and isinstance(self.raw, Decimal):
             return format_length_for_language(
                 self.raw, self.size_unit.length_unit, locale
             )
         token = self.raw if isinstance(self.raw, str) else format_raw(self.raw)
+        if (
+            self.size_unit.size_type.family == SizeFamily.CUP_SIZE
+            and isinstance(self.raw, str)
+        ):
+            token = format_cup_display(self.raw)
         if self.size_unit.display_prefix:
             return f"{self.size_unit.display_prefix}{token}"
         if self.size_unit.display_suffix:

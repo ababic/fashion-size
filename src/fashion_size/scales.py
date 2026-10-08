@@ -31,6 +31,7 @@ from fashion_size.types import (
     BABY_SHOE,
     BAND_SIZE,
     CHEST_SIZE,
+    CUP_ALPHA_ORDER,
     CUP_SIZE,
     DRESS,
     KIDS_SHOE,
@@ -39,9 +40,13 @@ from fashion_size.types import (
     LetterSizeRow,
     LocaleSizeRow,
     MissingScaleError,
+    SizeFamily,
     SizeType,
+    SizeUnit,
     chart_genders,
     format_age_gender,
+    is_cup_alpha_token,
+    normalize_cup_token,
     resolve_age_gender,
 )
 
@@ -329,3 +334,44 @@ def default_scale(
     raise MissingScaleError(
         f"No default {size_type.label} conversion chart for {tried}. Pass a brand-specific ConversionScale."
     )
+
+
+_CUP_ALPHA_RANK: dict[str, int] = {
+    token: index for index, token in enumerate(CUP_ALPHA_ORDER)
+}
+_CUP_LETTER_RANK: dict[str, int] = {}
+for _index, _row in enumerate(_CUP_SIZE_ROWS):
+    for _token in _row:
+        _CUP_LETTER_RANK.setdefault(_token, _index)
+
+
+def cup_attribute_values(size_unit: SizeUnit) -> tuple[str, ...]:
+    """Letter-chart values for ``size_unit``, then alpha labels in size order.
+
+    ``ConversionScale.raw_values`` is the regional letter chart only. Alpha labels
+    (``S``, ``MD``, ``LG``, ``XL``, …) are valid cup sizes and are not rows on that chart.
+    """
+    if size_unit.size_type.family is not SizeFamily.CUP_SIZE:
+        raise ValueError(f"{size_unit.label} is not a cup size.")
+    scale = default_scale(size_unit.size_type, AgeGroup.ADULT, Gender.FEMALE)
+    letters: list[str] = []
+    for value in scale.raw_values(size_unit):
+        if value not in letters:
+            letters.append(value)
+    return tuple(letters) + CUP_ALPHA_ORDER
+
+
+def cup_sort_key(value: str) -> tuple[int, int]:
+    """Sort key for a cup letter or alpha label.
+
+    Letters follow the default chart (values on the same row share a rank).
+    Alpha labels follow, from ``XXS`` through ``XXL``. Persist ``raw``, not the
+    short display: ``M`` and ``L`` are cup letters, not ``MD`` and ``LG``.
+    """
+    token = normalize_cup_token(value)
+    if is_cup_alpha_token(token):
+        return (1, _CUP_ALPHA_RANK[token])
+    rank = _CUP_LETTER_RANK.get(token)
+    if rank is None:
+        raise ValueError(f"Unknown cup size {value!r}.")
+    return (0, rank)

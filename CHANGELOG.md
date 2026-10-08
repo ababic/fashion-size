@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.10.8
+
+- Cup size accepts sports-bra alpha labels (`XXS`, `XS`, `S`, `MD`, `LG`, `XL`, `XXL`) with common aliases. They convert identically across UK / EU / US / AU. Single-letter `l` and `m` remain bra cup letters. Display shows `MD` / `LG` as `M` / `L`; `raw` stays canonical. `cup_attribute_values` and `cup_sort_key` cover option lists, because alpha labels are not rows on the letter chart.
+
 ## 2026.10.6
 
 - `ProductType.SWIMWEAR`, `OUTERWEAR`, `CASUAL_BOTTOMS`, `NIGHTWEAR`, `BRAS`, `SKIRTS`, `SHORTS`, and `HOSIERY` (tights, stockings, and socks) for brand charts that cover those ranges on their own.
