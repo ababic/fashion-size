@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
 from typing import Literal
@@ -943,12 +944,19 @@ class LetterSizeRow:
 
 @dataclass(frozen=True, slots=True)
 class ConversionScale:
-    """A complete value set for one size type and one age-group × gender pair."""
+    """A complete value set for one size type and one age-group × gender pair.
+
+    ``effective_from`` is when these rows start to apply. ``effective_until`` is
+    the next default chart's start for the same size type and demographic, or
+    none while this chart is the latest.
+    """
 
     size_type: SizeType
     age_group: str
     gender: str
     rows: tuple[LocaleSizeRow, ...] | tuple[LetterSizeRow, ...]
+    effective_from: datetime
+    effective_until: datetime | None = None
 
     def _chart_locale_and_needle(
         self,
@@ -1082,12 +1090,14 @@ class Size:
         brand_name: BrandName | str | None = None,
         product_type: ProductType | str | None = None,
         strict_brand_name: bool = False,
+        as_of: datetime | None = None,
     ) -> ConvertedSize:
         """Convert to ``unit`` on this size type.
 
         ``unit`` is a ``SizeUnit`` for this size type, or ``"cm"`` / ``"in"`` for a
-        length. Chart locales use ``convert_to_locale``. The result records how the
-        size was produced and cannot be converted again.
+        length. Chart locales use ``convert_to_locale``. ``as_of`` is when the raw
+        size was captured; omit it to use the chart in force now. The result
+        records how the size was produced and cannot be converted again.
         """
         from fashion_size.conversion import convert as convert_size
 
@@ -1098,6 +1108,7 @@ class Size:
             brand_name=brand_name,
             product_type=product_type,
             strict_brand_name=strict_brand_name,
+            as_of=as_of,
         )
 
     def convert_to_locale(
@@ -1108,11 +1119,12 @@ class Size:
         brand_name: BrandName | str | None = None,
         product_type: ProductType | str | None = None,
         strict_brand_name: bool = False,
+        as_of: datetime | None = None,
     ) -> ConvertedSize:
         """Convert to the ``SizeUnit`` for ``locale`` on this size type.
 
         ``locale`` is a ``Locale`` or a slug such as ``"eu"``. This resolves the
-        locale and calls ``convert``.
+        locale and calls ``convert``. ``as_of`` is when the raw size was captured.
         """
         from fashion_size.conversion import convert_to_locale as convert_locale
 
@@ -1123,6 +1135,7 @@ class Size:
             brand_name=brand_name,
             product_type=product_type,
             strict_brand_name=strict_brand_name,
+            as_of=as_of,
         )
 
     def __str__(self) -> str:

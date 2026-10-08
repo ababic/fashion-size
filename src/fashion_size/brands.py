@@ -3,8 +3,10 @@
 Override charts are JSON files named by id in ``fashion_size/fixtures/charts``.
 Each file holds the rows, the source page, and notes about that table. A brand
 with no charts matches the default charts. The id, size type, demographic,
-product types, and review date for each override live here. Brands with no
-garment size system (homeware, made-to-measure, promotional merch) are omitted.
+product types, review date, and the instant the rows take effect live here.
+A later chart for the same size type, demographic, and product types replaces
+the earlier one from its own effective instant. Brands with no garment size
+system (homeware, made-to-measure, promotional merch) are omitted.
 """
 
 from __future__ import annotations
@@ -56,7 +58,12 @@ class BrandName(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class OverrideChart:
-    """One chart that replaces the default for a size type and demographic."""
+    """One chart that replaces the default for a size type and demographic.
+
+    ``updated_at`` is the last review. ``effective_from`` is when these rows
+    start to apply. The next chart with the same size type, demographic, and
+    product types ends this one.
+    """
 
     id: str
     size_type: str
@@ -64,6 +71,7 @@ class OverrideChart:
     gender: str
     product_types: tuple[ProductType, ...]
     updated_at: datetime
+    effective_from: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +103,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
                 id="74ff4e47-b47b-45de-aff2-ee2932013960",
@@ -103,6 +112,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
@@ -117,6 +127,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
@@ -138,6 +149,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
                 id="33541989-d9c8-4395-87ab-2913ed1e4dec",
@@ -146,6 +158,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
@@ -163,6 +176,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
@@ -178,6 +192,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
                 id="c8292828-b338-44c8-a91a-8a211da44c03",
@@ -186,6 +201,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
@@ -204,6 +220,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
                 id="0dd48235-ad6c-40e2-96d7-0dd1c4a47c07",
@@ -212,6 +229,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
@@ -241,6 +259,7 @@ BRANDS: tuple[Brand, ...] = (
                     ProductType.ACTIVEWEAR_BOTTOMS,
                 ),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
                 id="01e55afd-5070-44a4-8b4c-2e6059df053e",
@@ -249,6 +268,7 @@ BRANDS: tuple[Brand, ...] = (
                 gender="female",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
             OverrideChart(
                 id="1051f93c-48a5-4cd1-a74f-76faa4328a48",
@@ -257,12 +277,25 @@ BRANDS: tuple[Brand, ...] = (
                 gender="male",
                 product_types=(ProductType.SHOES,),
                 updated_at=datetime(2026, 3, 29, tzinfo=UTC),
+                effective_from=datetime(2026, 3, 29, tzinfo=UTC),
             ),
         ),
     ),
 )
 
 SUPPORTED_BRANDS: tuple[BrandName, ...] = tuple(brand.name for brand in BRANDS)
+
+
+def as_of_moment(as_of: datetime | None) -> datetime:
+    """Return ``as_of``, or the current time when the caller omits it.
+
+    Chart windows are ordered with timezone-aware instants. A naive timestamp
+    is rejected.
+    """
+    moment = datetime.now(UTC) if as_of is None else as_of
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise ValueError("as_of must include a timezone.")
+    return moment
 
 
 def brand_differs_from_default(name: BrandName) -> bool:

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
 from fashion_size.brands import (
     BrandName,
+    as_of_moment,
     brand_differs_from_default,
     resolve_brand_name,
 )
@@ -49,6 +51,7 @@ def convert(
     brand_name: BrandName | str | None = None,
     product_type: ProductType | str | None = None,
     strict_brand_name: bool = False,
+    as_of: datetime | None = None,
 ) -> ConvertedSize:
     """Convert ``value`` to ``unit`` on the same size type.
 
@@ -56,6 +59,8 @@ def convert(
     length. ``demographic`` selects the chart. ``brand_name`` is any brand string.
     A ``BrandName`` selects that brand's chart; any other name uses the default
     unless ``strict_brand_name`` is true. ``product_type`` is a ``ProductType``.
+    ``as_of`` is when the raw size was captured. Omit it to use the chart in force
+    now. A capture time before a brand's first override uses the default chart.
     Band size always uses the default chart. French band size is the EU label plus 15.
 
     Returns a ``ConvertedSize`` naming the chart that was used. The result cannot
@@ -76,6 +81,7 @@ def convert(
         brand_name=brand_name,
         known_brand=known_brand,
         product_type=resolved_product_type,
+        as_of=as_of_moment(as_of),
     )
 
 
@@ -87,11 +93,13 @@ def convert_to_locale(
     brand_name: BrandName | str | None = None,
     product_type: ProductType | str | None = None,
     strict_brand_name: bool = False,
+    as_of: datetime | None = None,
 ) -> ConvertedSize:
     """Convert to the ``SizeUnit`` for ``locale`` on this size type.
 
     ``locale`` is a ``Locale`` or a slug such as ``"eu"``. This resolves that
-    locale to a ``SizeUnit`` and calls ``convert``.
+    locale to a ``SizeUnit`` and calls ``convert``. ``as_of`` is when the raw
+    size was captured.
     """
     return convert(
         value,
@@ -100,6 +108,7 @@ def convert_to_locale(
         brand_name=brand_name,
         product_type=product_type,
         strict_brand_name=strict_brand_name,
+        as_of=as_of,
     )
 
 
@@ -170,6 +179,7 @@ def _convert(
     brand_name: BrandName | str | None = None,
     known_brand: BrandName | None = None,
     product_type: ProductType | None = None,
+    as_of: datetime,
 ) -> ConvertedSize:
     if not value.size_unit.can_convert_to(resolved):
         raise IncompatibleSizeError(
@@ -199,12 +209,13 @@ def _convert(
             age_group,
             gender,
             product_type=product_type,
+            as_of=as_of,
         )
     if chart is not None:
         scale = _scale_from_chart(chart, value.size_type)
         source = ConversionSource.brand(chart)
     else:
-        scale = default_scale(value.size_type, age_group, gender)
+        scale = default_scale(value.size_type, age_group, gender, as_of=as_of)
         source = _default_source(
             scale,
             brand_name=brand_name,
@@ -238,6 +249,8 @@ def _scale_from_chart(chart: BrandConversionChart, size_type: SizeType) -> Conve
         age_group=chart.age_group,
         gender=chart.gender,
         rows=rows,
+        effective_from=chart.effective_from,
+        effective_until=chart.effective_until,
     )
 
 

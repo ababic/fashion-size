@@ -21,10 +21,18 @@ Sources checked (UK high-street guides first, since brand feeds follow them):
 
 Where UK guides disagree by half a shoe size, the UK → EU column is the same
 for every age group (EU sizes are unisex and UK sizes share one length scale).
+
+Each default chart has an effective window. The charts shipped here apply from
+the first representable instant until a later chart for the same size type and
+demographic replaces them.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
+from datetime import UTC, datetime
+
+from fashion_size.brands import as_of_moment
 from fashion_size.demographics import AgeGroup, Gender
 from fashion_size.types import (
     ADULT_SHOE,
@@ -52,18 +60,43 @@ from fashion_size.types import (
 
 _Number = int | float
 
+# The shipped defaults are the first generation. A later chart for the same
+# size type and demographic starts at its own effective instant.
+DEFAULT_SCALE_EPOCH = datetime.min.replace(tzinfo=UTC)
+
+
+def _seal(*scales: ConversionScale) -> tuple[ConversionScale, ...]:
+    """Close each generation when the next one starts.
+
+    Two charts for one size type and demographic that start together are an error.
+    """
+    ordered = tuple(sorted(scales, key=lambda scale: scale.effective_from))
+    if len({scale.effective_from for scale in ordered}) != len(ordered):
+        scale = ordered[0]
+        raise ValueError(
+            f"Two default {scale.size_type.label} charts for "
+            f"{format_age_gender(scale.age_group, scale.gender)} share an effective_from."
+        )
+    sealed: list[ConversionScale] = []
+    for index, scale in enumerate(ordered):
+        until = ordered[index + 1].effective_from if index + 1 < len(ordered) else None
+        sealed.append(replace(scale, effective_until=until))
+    return tuple(sealed)
+
 
 def _scale(
     size_type: SizeType,
     age_group: str,
     gender: str,
     rows: tuple[tuple[_Number, _Number, _Number, _Number], ...],
+    effective_from: datetime = DEFAULT_SCALE_EPOCH,
 ) -> ConversionScale:
     return ConversionScale(
         size_type=size_type,
         age_group=age_group,
         gender=gender,
         rows=tuple(LocaleSizeRow.from_numbers(*row) for row in rows),
+        effective_from=effective_from,
     )
 
 
@@ -257,12 +290,14 @@ def _letter_scale(
     age_group: str,
     gender: str,
     rows: tuple[tuple[str, str, str, str], ...],
+    effective_from: datetime = DEFAULT_SCALE_EPOCH,
 ) -> ConversionScale:
     return ConversionScale(
         size_type=size_type,
         age_group=age_group,
         gender=gender,
         rows=tuple(LetterSizeRow.from_tokens(*row) for row in rows),
+        effective_from=effective_from,
     )
 
 
@@ -270,9 +305,9 @@ def _letter_charts(
     size_type: SizeType,
     pairs: tuple[tuple[str, str], ...],
     rows: tuple[tuple[str, str, str, str], ...],
-) -> dict[tuple[str, str, str], ConversionScale]:
+) -> dict[tuple[str, str, str], tuple[ConversionScale, ...]]:
     return {
-        (size_type.slug, age, sex): _letter_scale(size_type, age, sex, rows)
+        (size_type.slug, age, sex): _seal(_letter_scale(size_type, age, sex, rows))
         for age, sex in pairs
     }
 
@@ -281,9 +316,9 @@ def _charts(
     size_type: SizeType,
     pairs: tuple[tuple[str, str], ...],
     rows: tuple[tuple[_Number, _Number, _Number, _Number], ...],
-) -> dict[tuple[str, str, str], ConversionScale]:
+) -> dict[tuple[str, str, str], tuple[ConversionScale, ...]]:
     return {
-        (size_type.slug, age, sex): _scale(size_type, age, sex, rows)
+        (size_type.slug, age, sex): _seal(_scale(size_type, age, sex, rows))
         for age, sex in pairs
     }
 
@@ -293,7 +328,7 @@ _ADULT_MALE = (AgeGroup.ADULT, Gender.MALE)
 _CHILD_ALL = (AgeGroup.CHILD, "")
 _BABY_ALL = (AgeGroup.BABY, "")
 
-DEFAULT_SCALES: dict[tuple[str, str, str], ConversionScale] = {
+DEFAULT_SCALES: dict[tuple[str, str, str], tuple[ConversionScale, ...]] = {
     **_charts(DRESS, (_ADULT_FEMALE,), _WOMEN_DRESS_ROWS),
     **_charts(DRESS, (_ADULT_MALE,), _MEN_DRESS_ROWS),
     # One kids chart. A brand can still store separate boys and girls rows.
@@ -316,18 +351,27 @@ DEFAULT_SCALES: dict[tuple[str, str, str], ConversionScale] = {
 
 
 def default_scale(
-    size_type: SizeType, age_group: AgeGroup | str, gender: Gender | str
+    size_type: SizeType,
+    age_group: AgeGroup | str,
+    gender: Gender | str,
+    *,
+    as_of: datetime | None = None,
 ) -> ConversionScale:
     """Return the hardcoded chart for this size type and age-group × gender pair.
 
-    Unisex products use the male chart. Children and babies fall back to the
-    shared chart for that age group when there is no boys or girls chart.
+    ``as_of`` is when the raw size was captured. Omit it to use the chart in force
+    now. Unisex products use the male chart. Children and babies fall back to the
+    shared chart for that age group when there is no boys or girls chart in force
+    at that instant.
     """
+    moment = as_of_moment(as_of)
     age, sex = resolve_age_gender(age_group, gender)
     for candidate in chart_genders(age, sex):
-        scale = DEFAULT_SCALES.get((size_type.slug, age, candidate))
-        if scale is not None:
-            return scale
+        for scale in DEFAULT_SCALES.get((size_type.slug, age, candidate), ()):
+            if scale.effective_from <= moment and (
+                scale.effective_until is None or moment < scale.effective_until
+            ):
+                return scale
     tried = " or ".join(
         format_age_gender(age, candidate) for candidate in chart_genders(age, sex)
     )
