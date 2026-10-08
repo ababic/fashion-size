@@ -430,8 +430,12 @@ BAND_SIZE = SizeType(
     ("bra-band-size",),
     slug_stem="band-size",
 )
-# Regional garment labels. UK/US/AU are the inch number; EU/IT is a different number.
-# Distinct from the length size types, which only convert centimetres and inches.
+# Regional garment labels. Display uses the length formatter when the number is
+# an inch or centimetre measurement on every chart for that locale. UK, US, and
+# AU waist and chest are inches. UK and US bands are inches; an EU band is
+# centimetres. Adult EU/IT waist and chest are a different number (kids' EU
+# values are centimetres), so that shared unit keeps a region prefix. An AU
+# band is a dress-style number. A French band is the EU centimetre label plus 15.
 WAIST_SIZE = SizeType(
     SizeTypeSlug.WAIST_SIZE,
     SizeFamily.WAIST_SIZE,
@@ -506,18 +510,37 @@ class SizeUnit:
         return self.label
 
 
-def _locale_size_unit(size_type: SizeType, locale: Locale) -> SizeUnit:
+def _locale_size_unit(
+    size_type: SizeType, locale: Locale, *, measurement: str | None = None
+) -> SizeUnit:
+    """Regional size unit.
+
+    ``measurement`` is ``"in"`` or ``"cm"`` when every chart for this locale
+    stores that unit. Display then matches length (``30"`` / ``30 in``,
+    ``75cm`` / ``75 cm``). The region prefix stays so stored text such as
+    ``UK 30`` still parses. Conversion stays on the locale chart.
+    """
     attribute = size_type.slug_stem or size_type.attribute_slugs[0]
     # Cup sizes display as the letter alone (``DD``). Dress and shoe sizes keep a region prefix.
     prefix = (
         "" if size_type.family == SizeFamily.CUP_SIZE else f"{locale.value.upper()} "
     )
+    if measurement == "in":
+        suffix = '"'
+    elif measurement == "cm":
+        suffix = "cm"
+    elif measurement is None:
+        suffix = ""
+    else:
+        raise ValueError(f"Unknown measurement unit {measurement!r}.")
     return SizeUnit(
         slug=f"{locale.value}-{attribute}",
         size_type=size_type,
         locale=locale,
         label=f"{locale.value.upper()} {size_type.label}",
         display_prefix=prefix,
+        display_suffix=suffix,
+        length_unit=measurement,
     )
 
 
@@ -560,11 +583,13 @@ EU_CUP_SIZE = _locale_size_unit(CUP_SIZE, Locale.EU)
 US_CUP_SIZE = _locale_size_unit(CUP_SIZE, Locale.US)
 AU_CUP_SIZE = _locale_size_unit(CUP_SIZE, Locale.AU)
 
-UK_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.UK)
-EU_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.EU)
-US_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.US)
+# UK and US bands are the underbust in inches. EU is that measurement in
+# centimetres. AU is a dress-style number (UK 34 = 12), and French is the EU
+# centimetre label plus 15, so those two keep a region prefix.
+UK_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.UK, measurement="in")
+EU_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.EU, measurement="cm")
+US_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.US, measurement="in")
 AU_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.AU)
-# French band is its own label (EU centimetres + 15), not an alias of EU.
 FR_BAND_SIZE = _locale_size_unit(BAND_SIZE, Locale.FR)
 
 # French dress, shoe, and cup sizes are the EU size.
@@ -574,15 +599,17 @@ FR_KIDS_SHOE_SIZE = EU_KIDS_SHOE_SIZE
 FR_BABY_SHOE_SIZE = EU_BABY_SHOE_SIZE
 FR_CUP_SIZE = EU_CUP_SIZE
 
-UK_WAIST_SIZE = _locale_size_unit(WAIST_SIZE, Locale.UK)
+# UK, US, and AU waist and chest numbers are inches on every chart. EU is not
+# one unit: adult rows are a continental size, children's rows are centimetres.
+UK_WAIST_SIZE = _locale_size_unit(WAIST_SIZE, Locale.UK, measurement="in")
 EU_WAIST_SIZE = _locale_size_unit(WAIST_SIZE, Locale.EU)
-US_WAIST_SIZE = _locale_size_unit(WAIST_SIZE, Locale.US)
-AU_WAIST_SIZE = _locale_size_unit(WAIST_SIZE, Locale.AU)
+US_WAIST_SIZE = _locale_size_unit(WAIST_SIZE, Locale.US, measurement="in")
+AU_WAIST_SIZE = _locale_size_unit(WAIST_SIZE, Locale.AU, measurement="in")
 
-UK_CHEST_SIZE = _locale_size_unit(CHEST_SIZE, Locale.UK)
+UK_CHEST_SIZE = _locale_size_unit(CHEST_SIZE, Locale.UK, measurement="in")
 EU_CHEST_SIZE = _locale_size_unit(CHEST_SIZE, Locale.EU)
-US_CHEST_SIZE = _locale_size_unit(CHEST_SIZE, Locale.US)
-AU_CHEST_SIZE = _locale_size_unit(CHEST_SIZE, Locale.AU)
+US_CHEST_SIZE = _locale_size_unit(CHEST_SIZE, Locale.US, measurement="in")
+AU_CHEST_SIZE = _locale_size_unit(CHEST_SIZE, Locale.AU, measurement="in")
 # French chest-size labels match EU. French waist size does not.
 FR_CHEST_SIZE = EU_CHEST_SIZE
 
@@ -1023,8 +1050,10 @@ class Size:
         Inches use a quote mark in English locales (``32"``) and a spaced `` in``
         suffix elsewhere (``32 in``). Centimetres omit the space in English
         (``81cm``) and include it otherwise (``81 cm``). Length display rounds
-        to the nearest centimetre or half inch; ``raw`` stays exact. Dress and
-        shoe sizes keep their UK / EU / US / AU prefix. Cup sizes are the letter
+        to the nearest centimetre or half inch; ``raw`` stays exact. UK, US, and
+        AU waist and chest sizes, and UK, US, and EU band sizes, use those same
+        rules. EU waist and chest labels, AU bands, and French bands keep a
+        region prefix, as do dress and shoe sizes. Cup sizes are the letter
         alone (``A``, ``DD``). Alpha ``MD`` / ``LG`` display as ``M`` / ``L``;
         ``raw`` stays ``MD`` / ``LG``. Persist ``raw``: parsing ``M`` or ``L``
         reads them as cup letters.

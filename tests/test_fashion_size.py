@@ -35,11 +35,16 @@ from fashion_size.product_types import PRODUCT_TYPE_SLUGS, resolve_product_type
 from fashion_size.scales import cup_attribute_values, cup_sort_key, default_scale
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
+    AU_BAND_SIZE,
+    AU_CHEST_SIZE,
+    AU_WAIST_SIZE,
     CM_CHEST_SIZE,
     EU_ADULT_SHOE_SIZE,
     EU_BAND_SIZE,
+    EU_CHEST_SIZE,
     EU_CUP_SIZE,
     EU_DRESS_SIZE,
+    EU_WAIST_SIZE,
     FR_BAND_SIZE,
     INCH_CHEST_SIZE,
     UK_ADULT_SHOE_SIZE,
@@ -50,7 +55,10 @@ from fashion_size.types import (
     UK_DRESS_SIZE,
     UK_KIDS_SHOE_SIZE,
     UK_WAIST_SIZE,
+    US_BAND_SIZE,
+    US_CHEST_SIZE,
     US_CUP_SIZE,
+    US_WAIST_SIZE,
     IncompatibleSizeError,
     LengthOutOfRangeError,
     MissingScaleError,
@@ -63,7 +71,7 @@ from fashion_size.types import (
 
 
 def test_version_is_the_current_release():
-    assert __version__ == "2026.10.8"
+    assert __version__ == "2026.10.8.1"
 
 
 def test_readme_brand_chart_example():
@@ -291,6 +299,38 @@ def test_length_conversion_and_display():
     register_display_language(lambda: "de")
     assert str(inches) == "32 in"
     assert inches.localised_display("en-gb") == '32"'
+
+
+def test_waist_chest_and_band_measurements_display_like_length():
+    assert Size.from_raw(30, UK_WAIST_SIZE).localised_display("en-gb") == '30"'
+    assert Size.from_raw(30, UK_WAIST_SIZE).localised_display("de") == "30 in"
+    assert Size.from_raw(30, US_WAIST_SIZE).display() == '30"'
+    assert Size.from_raw(30, AU_WAIST_SIZE).localised_display("fr") == "30 in"
+    assert Size.from_raw(46, EU_WAIST_SIZE).display() == "EU 46"
+    assert Size.from_raw(Decimal("30.3"), UK_WAIST_SIZE).display() == '30.5"'
+
+    assert Size.from_raw(40, UK_CHEST_SIZE).display() == '40"'
+    assert Size.from_raw(40, US_CHEST_SIZE).localised_display("de") == "40 in"
+    assert Size.from_raw(40, AU_CHEST_SIZE).localised_display("en-us") == '40"'
+    assert Size.from_raw(50, EU_CHEST_SIZE).display() == "EU 50"
+
+    assert Size.from_raw(34, UK_BAND_SIZE).display() == '34"'
+    assert Size.from_raw(34, UK_BAND_SIZE).localised_display("de") == "34 in"
+    assert Size.from_raw(34, US_BAND_SIZE).display() == '34"'
+    assert Size.from_raw(75, EU_BAND_SIZE).localised_display("en-gb") == "75cm"
+    assert Size.from_raw(75, EU_BAND_SIZE).localised_display("fr") == "75 cm"
+    assert Size.from_raw(Decimal("75.5"), EU_BAND_SIZE).localised_display("de") == "76 cm"
+    assert Size.from_raw(12, AU_BAND_SIZE).display() == "AU 12"
+    assert Size.from_raw(90, FR_BAND_SIZE).display() == "FR 90"
+
+    legacy = size_from_attribute_option("uk-waist-size", "UK 30")
+    assert legacy is not None and legacy.raw == 30 and legacy.display() == '30"'
+    quoted = size_from_attribute_option("uk-band-size", '34"')
+    assert quoted is not None and quoted.raw == 34
+    centimetres = size_from_attribute_option("eu-band-size", "75cm")
+    assert centimetres is not None and centimetres.raw == 75
+    assert size_from_attribute_option("au-band-size", "AU 12") is not None
+    assert size_from_attribute_option("eu-waist-size", "EU 46") is not None
 
 
 def test_conversion_rejects_unknown_or_incompatible_values():
