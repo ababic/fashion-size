@@ -42,7 +42,7 @@ chart.rows
 
 Each override chart is a JSON file named by id under `src/fashion_size/fixtures/charts`. The file holds the rows, the source page, and any notes about that table. Which brand it belongs to, the size type and demographic, when it was last checked, and when its rows take effect live in `fashion_size.brands`. A later chart for the same size type, demographic, and product types replaces the earlier one: `effective_until` is that next start, or none while the chart is current. A brand with no charts there matches the default charts. Superseded charts stay in the catalog.
 
-`chart_for` takes an optional `as_of` timestamp, the instant the raw size was captured. Omit it to use the chart in force now. A capture time before the first chart in a series returns none.
+`chart_for` takes an optional `as_of` timestamp, the instant the raw size was captured. Omit it to use the latest matching chart generation. A capture time before the first chart in a series returns none.
 
 ## Conversion
 
@@ -63,7 +63,7 @@ shoe.convert_to_locale(
 )
 ```
 
-`convert` takes a `SizeUnit` on the same size type, or `"cm"` / `"in"` for a length. `convert_to_locale` resolves a locale such as `"eu"` to that size type's `SizeUnit` and calls `convert`. Both require a `Demographic` (age group and gender). Optional `brand_name` and `product_type` select a brand chart. Optional `as_of` is when the raw size was captured; omit it to use the chart in force now. Set `strict_brand_name=True` to reject a brand name that is not in `SUPPORTED_BRANDS`.
+`convert` takes a `SizeUnit` on the same size type, or `"cm"` / `"in"` for a length. `convert_to_locale` resolves a locale such as `"eu"` to that size type's `SizeUnit` and calls `convert`. Both require a `Demographic` (age group and gender). Optional `brand_name` and `product_type` select a brand chart. Optional `as_of` is when the raw size was captured; omit it to use the latest matching brand chart generation and the current default chart. Set `strict_brand_name=True` to reject a brand name that is not in `SUPPORTED_BRANDS`.
 
 Both return a `ConvertedSize` with the resulting size and a `ConversionSource` (`identity`, `default`, `brand`, or `length_formula`). When the default chart is used, `source.default_reason` says why: no brand was passed (`no_brand`), the name is not in the catalog (`unknown_brand`), the catalog brand has no override charts (`brand_uses_default`), or the brand has no chart for this size type, product type, and capture time (`no_matching_chart`). Band size with a brand name records `size_type_uses_default`. `ConvertedSize` has no conversion method, so a converted value is not converted again.
 

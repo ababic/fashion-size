@@ -8,7 +8,6 @@ from typing import Literal
 
 from fashion_size.brands import (
     BrandName,
-    as_of_moment,
     brand_differs_from_default,
     resolve_brand_name,
 )
@@ -60,8 +59,9 @@ def convert(
     length. ``demographic`` selects the chart. ``brand_name`` is any brand string.
     A ``BrandName`` selects that brand's chart; any other name uses the default
     unless ``strict_brand_name`` is true. ``product_type`` is a ``ProductType``.
-    ``as_of`` is when the raw size was captured. Omit it to use the chart in force
-    now. A capture time before a brand's first override uses the default chart.
+    ``as_of`` is when the raw size was captured. Omit it to use the latest matching
+    brand chart generation and the current default chart. A capture time before a
+    brand's first override uses the default chart.
     Band size always uses the default chart. French band size is the EU label plus 15.
 
     Returns a ``ConvertedSize`` naming the chart that was used. The result cannot
@@ -82,7 +82,7 @@ def convert(
         brand_name=brand_name,
         known_brand=known_brand,
         product_type=resolved_product_type,
-        as_of=as_of_moment(as_of),
+        as_of=as_of,
     )
 
 
@@ -180,7 +180,7 @@ def _convert(
     brand_name: BrandName | str | None = None,
     known_brand: BrandName | None = None,
     product_type: ProductType | None = None,
-    as_of: datetime,
+    as_of: datetime | None,
 ) -> ConvertedSize:
     if not value.size_unit.can_convert_to(resolved):
         raise IncompatibleSizeError(
