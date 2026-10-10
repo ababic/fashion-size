@@ -80,7 +80,7 @@ from fashion_size.types import (
 
 
 def test_version_is_the_current_release():
-    assert __version__ == "2026.10.10"
+    assert __version__ == "2026.10.10.1"
 
 
 def test_readme_brand_chart_example():
@@ -841,6 +841,50 @@ def test_product_type_rules_apply_inside_the_chart_window(monkeypatch):
         )
         is shoes
     )
+
+
+def test_conversion_without_as_of_uses_the_latest_brand_chart(monkeypatch):
+    early = _shoe_chart(
+        id="00000000-0000-4000-8000-000000000013",
+        effective_from=datetime(2030, 1, 1, tzinfo=UTC),
+        rows=({"uk": 7, "eu": 41, "us": 9, "au": 9},),
+    )
+    late = _shoe_chart(
+        id="00000000-0000-4000-8000-000000000014",
+        effective_from=datetime(2031, 1, 1, tzinfo=UTC),
+        rows=({"uk": 7, "eu": 42, "us": 9, "au": 9},),
+    )
+    sealed = _apply_effective_windows((early, late))
+    monkeypatch.setattr(charts, "charts_for_brand", lambda brand_name: sealed)
+    shoe = Size.from_raw(7, UK_ADULT_SHOE_SIZE)
+    women = Demographic("adult", "female")
+    latest = shoe.convert_to_locale(
+        "eu",
+        demographic=women,
+        brand_name="Dune London",
+        product_type=ProductType.SHOES,
+    )
+    assert latest.raw == 42
+    assert latest.source.kind == ConversionSourceKind.BRAND
+    assert latest.source.brand_chart is sealed[1]
+    earlier = shoe.convert_to_locale(
+        "eu",
+        demographic=women,
+        brand_name="Dune London",
+        product_type=ProductType.SHOES,
+        as_of=datetime(2030, 6, 1, tzinfo=UTC),
+    )
+    assert earlier.raw == 41
+    assert earlier.source.brand_chart is sealed[0]
+    before = shoe.convert_to_locale(
+        "eu",
+        demographic=women,
+        brand_name="Dune London",
+        product_type=ProductType.SHOES,
+        as_of=datetime(2029, 12, 31, tzinfo=UTC),
+    )
+    assert before.source.kind == ConversionSourceKind.DEFAULT
+    assert before.source.default_reason == DefaultChartReason.NO_MATCHING_CHART
 
 
 def test_conversion_uses_the_chart_in_force_when_the_size_was_captured():

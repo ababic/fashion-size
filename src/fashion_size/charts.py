@@ -281,6 +281,13 @@ def _chart_in_force(chart: BrandConversionChart, moment: datetime) -> bool:
     return chart.effective_until is None or moment < chart.effective_until
 
 
+def _latest_chart(
+    charts: list[BrandConversionChart] | tuple[BrandConversionChart, ...],
+) -> BrandConversionChart:
+    """Return the newest chart by effective date, then review date."""
+    return max(charts, key=lambda chart: (chart.effective_from, chart.updated_at))
+
+
 def chart_for(
     brand_name: BrandName | str,
     size_type: str,
@@ -292,16 +299,16 @@ def chart_for(
 ) -> BrandConversionChart | None:
     """Pick a brand chart for this size type, demographic, and optional product type.
 
-    ``as_of`` is when the raw size was captured. Omit it to use the chart in force
-    now. A chart applies from ``effective_from`` until the next chart in the same
-    series. Product-type and gender rules run inside that instant: a chart that
+    ``as_of`` is when the raw size was captured. Omit it to use the latest matching
+    chart generation. A chart applies from ``effective_from`` until the next chart in
+    the same series. Product-type and gender rules run inside that instant: a chart that
     lists ``product_type`` wins over a chart with no product types (one chart for
     every product type). When ``product_type`` is omitted, a chart for that size
     type and demographic is returned only when there is exactly one. A male or
     female chart wins over a chart with a blank gender (the shared chart for that
     age group).
     """
-    moment = as_of_moment(as_of)
+    moment = as_of_moment(as_of) if as_of is not None else None
     age = age_group.strip().lower()
     sex = gender.strip().lower()
     size_type_slug = size_type.strip().lower()
@@ -315,7 +322,7 @@ def chart_for(
         if chart.size_type == size_type_slug
         and chart.age_group == age
         and chart.gender in {sex, ""}
-        and _chart_in_force(chart, moment)
+        and (moment is None or _chart_in_force(chart, moment))
     ]
     if product_type:
         explicit = [
@@ -330,4 +337,6 @@ def chart_for(
             candidates = gendered
     if len(candidates) == 1:
         return candidates[0]
+    if candidates and as_of is None:
+        return _latest_chart(candidates)
     return None
