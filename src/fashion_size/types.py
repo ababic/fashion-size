@@ -198,6 +198,30 @@ _CUP_ALPHA_ALIASES: dict[str, str] = {
     "2xl": "XXL",
 }
 
+# Alpha shoe labels are not regional chart rows. They map identically across locales.
+SHOE_ALPHA_ORDER: tuple[str, ...] = ("XXS", "XS", "S", "M", "L", "XL", "XXL")
+SHOE_ALPHA_TOKENS: frozenset[str] = frozenset(SHOE_ALPHA_ORDER)
+_SHOE_ALPHA_ALIASES: dict[str, str] = {
+    "xxs": "XXS",
+    "xs": "XS",
+    "xsmall": "XS",
+    "extrasmall": "XS",
+    "s": "S",
+    "sm": "S",
+    "small": "S",
+    "m": "M",
+    "md": "M",
+    "med": "M",
+    "medium": "M",
+    "l": "L",
+    "lg": "L",
+    "large": "L",
+    "xl": "XL",
+    "xlarge": "XL",
+    "xxl": "XXL",
+    "2xl": "XXL",
+}
+
 
 def _cup_alpha_lookup_key(value: str) -> str:
     return value.strip().lower().replace(" ", "").replace("-", "")
@@ -233,6 +257,27 @@ def normalize_cup_token(value: object) -> str:
     if token in CUP_TOKENS:
         return token
     raise ValueError(f"Unknown cup size {value!r}.")
+
+
+def normalize_shoe_token(value: object) -> str:
+    """Canonical alpha shoe label (``medium`` → ``M``)."""
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError(f"Unknown shoe size {value!r}.")
+    if text in SHOE_ALPHA_TOKENS:
+        return text
+    token = _SHOE_ALPHA_ALIASES.get(_cup_alpha_lookup_key(text))
+    if token is None:
+        raise ValueError(f"Unknown shoe size {value!r}.")
+    return token
+
+
+def shoe_alpha_token(value: object) -> str | None:
+    """Canonical alpha shoe label, or ``None`` when ``value`` is not one."""
+    try:
+        return normalize_shoe_token(value)
+    except ValueError:
+        return None
 
 
 def format_raw(value: int | float | str | Decimal) -> str:
@@ -860,6 +905,10 @@ def size_from_attribute_option(
     try:
         if size_unit.size_type.family == SizeFamily.CUP_SIZE:
             return Size(raw=normalize_cup_token(text), size_unit=size_unit)
+        if size_unit.size_type.family == SizeFamily.SHOE_SIZE:
+            token = shoe_alpha_token(text)
+            if token is not None:
+                return Size(raw=token, size_unit=size_unit)
         if size_unit.size_type.family == SizeFamily.LENGTH:
             return Size(raw=normalize_length_raw(text), size_unit=size_unit)
         return Size(raw=normalize_raw(text), size_unit=size_unit)
@@ -1014,9 +1063,17 @@ class ConversionScale:
             token = normalize_cup_token(raw)
             if is_cup_alpha_token(token):
                 return token
+        if self.size_type.family == SizeFamily.SHOE_SIZE:
+            token = shoe_alpha_token(raw)
+            if token is not None:
+                return token
         if source == target:
             if self.size_type.family == SizeFamily.CUP_SIZE:
                 return normalize_cup_token(raw)
+            if self.size_type.family == SizeFamily.SHOE_SIZE:
+                token = shoe_alpha_token(raw)
+                if token is not None:
+                    return token
             return normalize_raw(raw)
         return self._value_for_size_unit(self.row_for(raw, source), target)
 
@@ -1026,7 +1083,8 @@ class Size:
     """An amount stored in a ``SizeUnit``.
 
     Numeric size types store a ``Decimal``. Cup size stores the letter for that
-    locale (``DD``, ``E``, ``DDD``).
+    locale (``DD``, ``E``, ``DDD``). Shoe size can also store alpha labels
+    (``XXS`` ... ``XXL``), which convert identically across locales.
     """
 
     raw: Decimal | str
@@ -1035,6 +1093,12 @@ class Size:
     def __post_init__(self) -> None:
         if self.size_unit.size_type.family == SizeFamily.CUP_SIZE:
             object.__setattr__(self, "raw", normalize_cup_token(self.raw))
+        elif self.size_unit.size_type.family == SizeFamily.SHOE_SIZE:
+            token = shoe_alpha_token(self.raw)
+            if token is not None:
+                object.__setattr__(self, "raw", token)
+            else:
+                object.__setattr__(self, "raw", normalize_raw(self.raw))
         elif self.size_unit.size_type.family == SizeFamily.LENGTH:
             object.__setattr__(self, "raw", normalize_length_raw(self.raw))
         else:

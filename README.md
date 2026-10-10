@@ -77,6 +77,8 @@ UK, US, and AU waist and chest labels are the inch measurement, so they display 
 
 Sports bras and bralettes can use alpha cup labels on the same size type. Stored values are `XXS`, `XS`, `S`, `MD`, `LG`, `XL`, and `XXL` (`CUP_ALPHA_ORDER`). Common aliases (`small`, `med`, `medium`, `lg`, `large`, `x-large`, `2xl`) normalise to those. They convert identically across UK / EU / US / AU. `Size.display` shows `MD` / `LG` as `M` / `L`; `raw` stays `MD` / `LG`. Single-letter `m` and `l` are bra cup letters, so a feed that means alpha must send `MD` / `LG` (or `medium` / `large`) — do not persist the short display and parse it again. These labels are not rows on the letter chart. `cup_attribute_values` appends them after the chart letters for a locale, and `cup_sort_key` orders letters by chart row, then alpha from `XXS` to `XXL`.
 
+Shoe sizes can also use alpha labels (`XXS`, `XS`, `S`, `M`, `L`, `XL`, `XXL`) on the existing shoe size types (`adult-shoe`, `kids-shoe`, `baby-shoe`). Common aliases (`small`, `medium`, `large`, `x-large`, `2xl`) normalise to canonical tokens. These alpha labels convert identically across UK / EU / US / AU and are not rows on numeric charts. `shoe_attribute_values(size_unit, age_group=..., gender=...)` appends them after the chart values for that demographic.
+
 Display language defaults to `en-gb`. A host application can register its own getter (Django's `get_language`, for example) with `fashion_size.register_display_language`.
 
 ## Development

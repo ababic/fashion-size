@@ -33,6 +33,7 @@ from fashion_size.types import (
     format_raw,
     is_cup_alpha_token,
     normalize_cup_token,
+    shoe_alpha_token,
     size_unit_for_length_unit,
     size_unit_for_locale,
 )
@@ -195,6 +196,13 @@ def _convert(
             size=Size(raw=normalize_cup_token(value.raw), size_unit=resolved),
             source=ConversionSource.identity(),
         )
+    if value.size_type.family == SizeFamily.SHOE_SIZE:
+        token = shoe_alpha_token(value.raw)
+        if token is not None:
+            return ConvertedSize(
+                size=Size(raw=token, size_unit=resolved),
+                source=ConversionSource.identity(),
+            )
     if value.size_type.family == SizeFamily.LENGTH:
         converted = _convert_length(value.raw, value.size_unit, resolved)
         return ConvertedSize(

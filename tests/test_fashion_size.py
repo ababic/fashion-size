@@ -40,6 +40,7 @@ from fashion_size.scales import (
     cup_attribute_values,
     cup_sort_key,
     default_scale,
+    shoe_attribute_values,
 )
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
@@ -79,7 +80,7 @@ from fashion_size.types import (
 
 
 def test_version_is_the_current_release():
-    assert __version__ == "2026.10.8.1"
+    assert __version__ == "2026.10.10"
 
 
 def test_readme_brand_chart_example():
@@ -270,6 +271,28 @@ def test_cup_alpha_tokens_convert_with_identity_across_locales():
     assert cup_sort_key("XS") < cup_sort_key("S")
 
 
+def test_shoe_alpha_tokens_convert_with_identity_across_locales():
+    women = Demographic("adult", "female")
+    alpha = Size.from_raw("medium", UK_ADULT_SHOE_SIZE)
+    assert alpha.raw == "M"
+    assert str(alpha) == "UK M"
+    converted = alpha.convert_to_locale("eu", demographic=women)
+    assert converted.raw == "M"
+    assert converted.display() == "EU M"
+    assert converted.source.kind == ConversionSourceKind.IDENTITY
+    assert (
+        Size.from_raw("x-large", EU_ADULT_SHOE_SIZE)
+        .convert_to_locale("uk", demographic=women)
+        .raw
+        == "XL"
+    )
+    values = shoe_attribute_values(UK_ADULT_SHOE_SIZE, age_group="adult", gender="female")
+    assert values[-7:] == ("XXS", "XS", "S", "M", "L", "XL", "XXL")
+    assert "M" not in default_scale(
+        UK_ADULT_SHOE_SIZE.size_type, "adult", "female"
+    ).raw_values(UK_ADULT_SHOE_SIZE)
+
+
 def test_length_conversion_and_display():
     inches = Size.from_raw(32, INCH_CHEST_SIZE)
     centimetres = inches.convert("cm", demographic=Demographic("adult", "unisex"))
@@ -420,6 +443,8 @@ def test_attribute_options_and_size_unit_slugs():
     assert cup is not None and cup.raw == "DD"
     alpha_cup = size_from_attribute_option("uk-cup-size", "x-large")
     assert alpha_cup is not None and alpha_cup.raw == "XL"
+    alpha_shoe = size_from_attribute_option("uk-adult-shoe-size", "UK x-large")
+    assert alpha_shoe is not None and alpha_shoe.raw == "XL"
     assert size_from_attribute_option("uk-dress-size", "small") is None
     assert size_from_attribute_option("not-a-size", "10") is None
 
