@@ -31,6 +31,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from fashion_size.brands import as_of_moment
 from fashion_size.demographics import AgeGroup, Gender
@@ -43,6 +44,7 @@ from fashion_size.types import (
     CUP_SIZE,
     DRESS,
     KIDS_SHOE,
+    SHOE_ALPHA_ORDER,
     WAIST_SIZE,
     ConversionScale,
     LetterSizeRow,
@@ -419,3 +421,17 @@ def cup_sort_key(value: str) -> tuple[int, int]:
     if rank is None:
         raise ValueError(f"Unknown cup size {value!r}.")
     return (0, rank)
+
+
+def shoe_attribute_values(
+    size_unit: SizeUnit, *, age_group: AgeGroup | str, gender: Gender | str
+) -> tuple[Decimal | str, ...]:
+    """Numeric chart values for ``size_unit``, then alpha labels in size order.
+
+    ``ConversionScale.raw_values`` is the regional numeric chart only. Alpha labels
+    (``XXS`` … ``XXL``) are valid shoe sizes and are not rows on those charts.
+    """
+    if size_unit.size_type.family is not SizeFamily.SHOE_SIZE:
+        raise ValueError(f"{size_unit.label} is not a shoe size.")
+    scale = default_scale(size_unit.size_type, age_group, gender)
+    return tuple(scale.raw_values(size_unit)) + SHOE_ALPHA_ORDER
