@@ -22,6 +22,28 @@ This package does not depend on Django. Django model fields are in [`django-fash
 
 The source repository is [github.com/ababic/fashion-size](https://github.com/ababic/fashion-size).
 
+## Size types and conversion behavior
+
+`fashion-size` supports three conversion models:
+
+- **Brand-variable chart lookup**: the size type can use default scales or brand overrides.
+- **Fixed default chart lookup**: the size type always uses shipped default scales.
+- **Fixed formula conversion**: conversion is direct (`in` <-> `cm`), not chart-based.
+
+| Size type | Common size units | Conversion model | How units vary |
+| --- | --- | --- | --- |
+| Dress (`dress`) | `uk-dress-size`, `eu-dress-size`, `us-dress-size`, `au-dress-size` (`fr-dress-size` resolves to EU) | Brand-variable chart lookup | Regional numeric labels. French dress labels are the EU value. |
+| Adult shoe (`adult-shoe`) | `uk-adult-shoe-size`, `eu-adult-shoe-size`, `us-adult-shoe-size`, `au-adult-shoe-size` (`fr-adult-shoe-size` resolves to EU) | Brand-variable chart lookup | Numeric rows vary by locale; alpha shoe labels (`XXS` ... `XXL`) are accepted and convert identically across UK/EU/US/AU. |
+| Kids shoe (`kids-shoe`) | `uk-kids-shoe-size`, `eu-kids-shoe-size`, `us-kids-shoe-size`, `au-kids-shoe-size` (`fr-kids-shoe-size` resolves to EU) | Brand-variable chart lookup | Same unit behavior as adult shoes, but with the kids shoe chart lineage. |
+| Baby shoe (`baby-shoe`) | `uk-baby-shoe-size`, `eu-baby-shoe-size`, `us-baby-shoe-size`, `au-baby-shoe-size` (`fr-baby-shoe-size` resolves to EU) | Brand-variable chart lookup | Same unit behavior as other shoes, but with the baby shoe chart lineage. |
+| Cup (`cup-size`) | `uk-cup-size`, `eu-cup-size`, `us-cup-size`, `au-cup-size` (`fr-cup-size` resolves to EU) | Brand-variable chart lookup | Letter mappings differ across locales (`DD`/`E`/`DDD` etc). Alpha cup labels (`XXS`, `XS`, `S`, `MD`, `LG`, `XL`, `XXL`) are locale-identity values. |
+| Band (`band-size`) | `uk-band-size`, `eu-band-size`, `us-band-size`, `au-band-size`, `fr-band-size` | Fixed default chart lookup | UK/US are inch labels, EU is centimetre label, AU is dress-style number, and FR is EU + 15. Brand overrides are intentionally disabled for this type. |
+| Waist label (`waist-size`) | `uk-waist-size`, `eu-waist-size`, `us-waist-size`, `au-waist-size` | Brand-variable chart lookup | UK/US/AU waist labels are inch-based. EU waist is a shared regional unit: adult rows use continental labels, while child rows use centimetres. |
+| Chest label (`chest-size`) | `uk-chest-size`, `eu-chest-size`, `us-chest-size`, `au-chest-size` (`fr-chest-size` resolves to EU) | Brand-variable chart lookup | UK/US/AU chest labels are inch-based. EU chest is a shared regional unit: adult rows use continental labels, while child rows use centimetres. French chest labels match EU. |
+| Body lengths (`chest`, `waist`, `inside-leg`, `collar`) | `cm-*` and `in-*` variants (`cm-chest-size`, `in-waist-size`, etc.) | Fixed formula conversion | Direct `in`/`cm` conversion (`1 in = 2.54 cm`), with display rounding only (stored `raw` value is unchanged). |
+
+Today, shipped brand overrides are concentrated in selected dress and shoe charts. Types still marked as brand-variable above continue to fall back to default scales when no matching brand chart exists for the brand, demographic, product type, and `as_of` capture instant.
+
 ## Brand charts
 
 ```python
