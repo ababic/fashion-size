@@ -429,13 +429,35 @@ class SizeType:
     # SizeUnit slug stem when it must not also be an attribute-slug alias.
     # ``uk-waist-size`` is the regional label; ``waist-size`` stays the length size type.
     slug_stem: str = ""
+    # Inclusive inch bounds for ``SizeFamily.LENGTH`` formula conversion. ``None``
+    # uses the generic clothing-length defaults shared by chest, waist, and collar.
+    length_min_inches: Decimal | None = None
+    length_max_inches: Decimal | None = None
 
     @property
     def supports_brand_overrides(self) -> bool:
         return self.family.supports_brand_overrides
 
+    def clothing_length_inch_bounds(self) -> tuple[Decimal, Decimal]:
+        if self.family != SizeFamily.LENGTH:
+            raise ValueError(
+                f"{self.label} is not a length size type — inch bounds do not apply."
+            )
+        return (
+            self.length_min_inches
+            if self.length_min_inches is not None
+            else CLOTHING_LENGTH_MIN_INCHES,
+            self.length_max_inches
+            if self.length_max_inches is not None
+            else CLOTHING_LENGTH_MAX_INCHES,
+        )
+
     def __str__(self) -> str:
         return self.label
+
+
+CLOTHING_LENGTH_MIN_INCHES = Decimal("5")
+CLOTHING_LENGTH_MAX_INCHES = Decimal("150")
 
 
 DRESS = SizeType(
@@ -502,6 +524,22 @@ INSIDE_LEG = SizeType(
     "Inside leg",
     ("inside-leg", "leg-length"),
 )
+SHORTS_INSEAM = SizeType(
+    SizeTypeSlug.SHORTS_INSEAM,
+    SizeFamily.LENGTH,
+    "Shorts inseam",
+    ("shorts-inseam",),
+    length_min_inches=Decimal("3"),
+    length_max_inches=Decimal("26"),
+)
+TROUSERS_INSEAM = SizeType(
+    SizeTypeSlug.TROUSERS_INSEAM,
+    SizeFamily.LENGTH,
+    "Trousers inseam",
+    ("trousers-inseam",),
+    length_min_inches=Decimal("26"),
+    length_max_inches=Decimal("40"),
+)
 COLLAR = SizeType(SizeTypeSlug.COLLAR, SizeFamily.LENGTH, "Collar", ("collar-size",))
 
 SIZE_TYPES: tuple[SizeType, ...] = (
@@ -516,6 +554,8 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     CHEST,
     WAIST,
     INSIDE_LEG,
+    SHORTS_INSEAM,
+    TROUSERS_INSEAM,
     COLLAR,
 )
 SIZE_TYPE_BY_SLUG: dict[str, SizeType] = {
@@ -677,6 +717,18 @@ INCH_INSIDE_LEG = _length_size_unit(
 CM_INSIDE_LEG = _length_size_unit(
     INSIDE_LEG, unit="cm", display_suffix="cm", label_unit="centimetres"
 )
+INCH_SHORTS_INSEAM = _length_size_unit(
+    SHORTS_INSEAM, unit="in", display_suffix='"', label_unit="inches"
+)
+CM_SHORTS_INSEAM = _length_size_unit(
+    SHORTS_INSEAM, unit="cm", display_suffix="cm", label_unit="centimetres"
+)
+INCH_TROUSERS_INSEAM = _length_size_unit(
+    TROUSERS_INSEAM, unit="in", display_suffix='"', label_unit="inches"
+)
+CM_TROUSERS_INSEAM = _length_size_unit(
+    TROUSERS_INSEAM, unit="cm", display_suffix="cm", label_unit="centimetres"
+)
 INCH_COLLAR_SIZE = _length_size_unit(
     COLLAR, unit="in", display_suffix='"', label_unit="inches"
 )
@@ -724,6 +776,10 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     CM_WAIST_SIZE,
     INCH_INSIDE_LEG,
     CM_INSIDE_LEG,
+    INCH_SHORTS_INSEAM,
+    CM_SHORTS_INSEAM,
+    INCH_TROUSERS_INSEAM,
+    CM_TROUSERS_INSEAM,
     INCH_COLLAR_SIZE,
     CM_COLLAR_SIZE,
 )

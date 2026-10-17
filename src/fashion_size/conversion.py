@@ -38,8 +38,6 @@ from fashion_size.types import (
 )
 
 CM_PER_INCH = Decimal("2.54")
-MIN_INCHES = Decimal("5")
-MAX_INCHES = Decimal("150")
 LengthUnitSlug = Literal["cm", "in"]
 
 
@@ -272,10 +270,12 @@ def _inches_from_length(raw: Decimal, source: SizeUnit) -> Decimal:
 
 def _assert_clothing_length_range(raw: Decimal, source: SizeUnit) -> None:
     inches = _inches_from_length(raw, source)
-    if inches < MIN_INCHES or inches > MAX_INCHES:
+    min_inches, max_inches = source.size_type.clothing_length_inch_bounds()
+    if inches < min_inches or inches > max_inches:
         raise LengthOutOfRangeError(
             f"Length {format_raw(raw)}{source.display_suffix or ''} is outside the "
-            f"{format_raw(MIN_INCHES)}–{format_raw(MAX_INCHES)} inch clothing range."
+            f"{format_raw(min_inches)}–{format_raw(max_inches)} inch range for "
+            f"{source.size_type.label}."
         )
 
 

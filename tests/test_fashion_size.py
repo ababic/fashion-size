@@ -56,6 +56,8 @@ from fashion_size.types import (
     EU_WAIST_SIZE,
     FR_BAND_SIZE,
     INCH_CHEST_SIZE,
+    INCH_SHORTS_INSEAM,
+    INCH_TROUSERS_INSEAM,
     UK_ADULT_SHOE_SIZE,
     UK_BABY_SHOE_SIZE,
     UK_BAND_SIZE,
@@ -332,6 +334,50 @@ def test_length_conversion_and_display():
     register_display_language(lambda: "de")
     assert str(inches) == "32 in"
     assert inches.localised_display("en-gb") == '32"'
+
+
+def test_garment_inseam_length_bounds():
+    demographic = Demographic("adult", "unisex")
+    assert (
+        Size.from_raw(3, INCH_SHORTS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("7.62")
+    )
+    assert (
+        Size.from_raw(26, INCH_SHORTS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("66.04")
+    )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("2.9"), INCH_SHORTS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("26.1"), INCH_SHORTS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+
+    assert (
+        Size.from_raw(32, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("81.28")
+    )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(25, INCH_TROUSERS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("40.1"), INCH_TROUSERS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+
+    shorts = size_from_attribute_option("in-shorts-inseam", '5"')
+    assert shorts is not None and shorts.size_unit is INCH_SHORTS_INSEAM
+    trousers = size_from_attribute_option("cm-trousers-inseam", "81cm")
+    assert trousers is not None and trousers.raw == Decimal("81")
 
 
 def test_waist_chest_and_band_measurements_display_like_length():
