@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `shorts-inseam` and `trousers-inseam` length size types with non-overlapping inch bounds 2–20 and 22–42 (retail-aligned, with headroom for big-and-tall). Formula conversion rejects values outside each type's range. Generic `inside-leg` keeps the 5–150 inch clothing range.
+- `shorts-inseam` and `trousers-inseam` length size types with non-overlapping inch bounds 2–22 and 24–42 (retail-aligned, with headroom for long shorts and big-and-tall trousers). Formula conversion rejects values outside each type's range. Generic `inside-leg` keeps the 5–150 inch clothing range.
 - `clothing_length_entry_bounds`, `clothing_length_value_in_range`, and `clothing_length_size_types_for_inches` / `clothing_length_size_types_for_measurement` for form min/max and inferring which length attribute a raw value might represent. `size_from_attribute_option` rejects out-of-range length values.
 - Brand and default conversion charts keep earlier generations. `effective_from` is when a chart's rows start to apply. `effective_until` is the next chart's start for the same size type, demographic, and product types. `chart_for`, `Size.convert`, and `Size.convert_to_locale` take optional `as_of`, the instant the raw size was captured. Omit it to use the latest matching brand chart generation and the current default chart. A capture time before a brand's first override uses the default chart. Loaded brand charts include their catalog `id`.
 - The release workflow publishes a `v*` tag only when that commit is on `main` or a `release-*` branch.
