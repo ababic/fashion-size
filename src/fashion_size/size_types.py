@@ -28,4 +28,5 @@ class SizeTypeSlug(StrEnum):
     TOP_LENGTH = "top-length"
     SHOE_WIDTH = "shoe-width"
     PROPORTION = "proportion"
-    AGE = "age"
+    AGE_MONTHS = "age-months"
+    AGE_YEARS = "age-years"

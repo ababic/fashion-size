@@ -642,11 +642,17 @@ PROPORTION = SizeType(
     "Proportion",
     ("proportion",),
 )
-AGE = SizeType(
-    SizeTypeSlug.AGE,
+AGE_MONTHS = SizeType(
+    SizeTypeSlug.AGE_MONTHS,
     SizeFamily.LABEL,
-    "Age",
-    ("age", "age-range"),
+    "Age (months)",
+    ("age-months",),
+)
+AGE_YEARS = SizeType(
+    SizeTypeSlug.AGE_YEARS,
+    SizeFamily.LABEL,
+    "Age (years)",
+    ("age-years",),
 )
 
 SIZE_TYPES: tuple[SizeType, ...] = (
@@ -668,7 +674,8 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     TOP_LENGTH,
     SHOE_WIDTH,
     PROPORTION,
-    AGE,
+    AGE_MONTHS,
+    AGE_YEARS,
 )
 SIZE_TYPE_BY_SLUG: dict[str, SizeType] = {
     size_type.slug: size_type for size_type in SIZE_TYPES
@@ -897,9 +904,13 @@ def _length_recognition(size_type: SizeType, unit: str) -> tuple[str, ...]:
 
 
 def _label_recognition(size_type: SizeType) -> tuple[str, ...]:
-    if size_type.slug == "age":
+    if size_type.slug == "age-months":
         return (
-            r"(?<!\d)(?P<value>\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:months?|mths?|mth|years?|yrs?|yr|y))(?![A-Za-z])",
+            r"(?<!\d)(?P<value>\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:months?|mths?|mth|m))(?![A-Za-z])",
+        )
+    if size_type.slug == "age-years":
+        return (
+            r"(?<!\d)(?P<value>\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:years?|yrs?|yr|y))(?![A-Za-z])",
         )
     if size_type.slug == "shoe-width":
         return (
@@ -1076,7 +1087,8 @@ TROUSER_LENGTH_SIZE = _label_size_unit(TROUSER_LENGTH)
 TOP_LENGTH_SIZE = _label_size_unit(TOP_LENGTH)
 SHOE_WIDTH_SIZE = _label_size_unit(SHOE_WIDTH)
 PROPORTION_SIZE = _label_size_unit(PROPORTION)
-AGE_SIZE = _label_size_unit(AGE)
+AGE_MONTHS_SIZE = _label_size_unit(AGE_MONTHS)
+AGE_YEARS_SIZE = _label_size_unit(AGE_YEARS)
 
 # Canonical token → English display. Aliases fold into the canonical token.
 _LABEL_CANONICAL: dict[str, dict[str, str]] = {
@@ -1179,8 +1191,8 @@ _LABEL_ALIASES: dict[str, dict[str, str]] = {
 
 def label_display(size_type: SizeType, token: str) -> str:
     """English label for a canonical label-size token, including age bands."""
-    if size_type.slug == AGE.slug:
-        return _format_age_token(token)
+    if size_type.slug in {AGE_MONTHS.slug, AGE_YEARS.slug}:
+        return _format_age_token(token, size_type)
     table = _LABEL_CANONICAL.get(size_type.slug, {})
     try:
         return table[token]
@@ -1191,8 +1203,8 @@ def label_display(size_type: SizeType, token: str) -> str:
 def normalize_label_token(size_type: SizeType, raw: object) -> str:
     """Fold synonyms into the canonical token for a label size type."""
     text = str(raw).strip()
-    if size_type.slug == AGE.slug:
-        return _normalize_age_token(text)
+    if size_type.slug in {AGE_MONTHS.slug, AGE_YEARS.slug}:
+        return _normalize_age_token(text, size_type)
     key = re_sub_spaces(text.replace("-", " "))
     aliases = _LABEL_ALIASES.get(size_type.slug, {})
     if key in aliases:
@@ -1203,41 +1215,35 @@ def normalize_label_token(size_type: SizeType, raw: object) -> str:
     raise ValueError(f"Unknown {size_type.label} value {raw!r}.")
 
 
-def _normalize_age_token(text: str) -> str:
-    """``5-6 years`` / ``12Y`` / ``0-3 mths`` → ``5-6y`` / ``12y`` / ``0-3m``."""
+def _age_span(start: str, end: str | None) -> str:
+    return f"{int(start)}-{int(end)}" if end else str(int(start))
+
+
+def _normalize_age_token(text: str, size_type: SizeType) -> str:
+    """``5-6 years`` / ``12Y`` / ``0-3 mths`` → ``5-6`` / ``12`` / ``0-3`` on the matching type."""
     compact = text.strip().lower().replace("–", "-")
-    months = re.fullmatch(
-        r"(\d{1,2})\s*-\s*(\d{1,2})\s*(?:months?|mths?|mth|m)", compact
+    months = size_type.slug == AGE_MONTHS.slug
+    unit_pattern = (
+        r"(?:months?|mths?|mth|m)" if months else r"(?:years?|yrs?|yr|y)"
     )
-    if months:
-        return f"{int(months.group(1))}-{int(months.group(2))}m"
-    years = re.fullmatch(r"(\d{1,2})\s*-\s*(\d{1,2})\s*(?:years?|yrs?|yr|y)", compact)
-    if years:
-        return f"{int(years.group(1))}-{int(years.group(2))}y"
-    one_month = re.fullmatch(r"(\d{1,2})\s*(?:months?|mths?|mth)", compact)
-    if one_month:
-        number = int(one_month.group(1))
-        return f"{number}m"
-    one_year = re.fullmatch(r"(\d{1,2})\s*(?:years?|yrs?|yr|y)", compact)
-    if one_year:
-        return f"{int(one_year.group(1))}y"
-    already = re.fullmatch(r"(\d{1,2})(?:-(\d{1,2}))?([my])", compact.replace(" ", ""))
-    if already:
-        start = int(already.group(1))
-        end = already.group(2)
-        unit = already.group(3)
-        return f"{start}-{int(end)}{unit}" if end else f"{start}{unit}"
-    raise ValueError(f"Unknown age value {text!r}.")
+    band = re.fullmatch(rf"(\d{{1,2}})\s*-\s*(\d{{1,2}})\s*{unit_pattern}", compact)
+    if band:
+        return _age_span(band.group(1), band.group(2))
+    single = re.fullmatch(rf"(\d{{1,2}})\s*{unit_pattern}", compact)
+    if single:
+        return _age_span(single.group(1), None)
+    bare = re.fullmatch(r"(\d{1,2})(?:\s*-\s*(\d{1,2}))?", compact)
+    if bare:
+        return _age_span(bare.group(1), bare.group(2))
+    raise ValueError(f"Unknown {size_type.label} value {text!r}.")
 
 
-def _format_age_token(token: str) -> str:
-    match = re.fullmatch(r"(\d{1,2})(?:-(\d{1,2}))?([my])", token)
+def _format_age_token(token: str, size_type: SizeType) -> str:
+    match = re.fullmatch(r"(\d{1,2})(?:-(\d{1,2}))?", token)
     if match is None:
-        raise ValueError(f"Unknown age token {token!r}.")
-    start = match.group(1)
-    end = match.group(2)
-    span = f"{start}-{end}" if end else start
-    if match.group(3) == "m":
+        raise ValueError(f"Unknown {size_type.label} token {token!r}.")
+    span = _age_span(match.group(1), match.group(2))
+    if size_type.slug == AGE_MONTHS.slug:
         unit = "month" if span == "1" else "months"
     else:
         unit = "year" if span == "1" else "years"
@@ -1298,7 +1304,8 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     TOP_LENGTH_SIZE,
     SHOE_WIDTH_SIZE,
     PROPORTION_SIZE,
-    AGE_SIZE,
+    AGE_MONTHS_SIZE,
+    AGE_YEARS_SIZE,
 )
 SIZE_UNIT_BY_SLUG: dict[str, SizeUnit] = {
     size_unit.slug: size_unit for size_unit in SIZE_UNITS

@@ -5,7 +5,8 @@ import pytest
 from fashion_size.descriptions import decode_size_description, encode_size_description
 from fashion_size.product_types import ProductType
 from fashion_size.types import (
-    AGE_SIZE,
+    AGE_MONTHS_SIZE,
+    AGE_YEARS_SIZE,
     CM_WAIST_SIZE,
     EU_ADULT_SHOE_SIZE,
     EU_DRESS_SIZE,
@@ -29,14 +30,18 @@ from fashion_size.types import (
 
 
 def test_waist_leg_and_length_code():
-    decoded = decode_size_description("30/32", Locale.UK, product_type=ProductType.JEANS)
+    decoded = decode_size_description(
+        "30/32", Locale.UK, product_type=ProductType.JEANS
+    )
     assert decoded.format_id == "waist-leg"
     assert decoded.confidence >= 0.9
     assert [size.raw for size in decoded.sizes] == [30, 32]
     encoded = encode_size_description(decoded.sizes, Locale.UK)
     assert encoded.text == "30/32"
 
-    length = decode_size_description("30L", Locale.UK, product_type=ProductType.TROUSERS)
+    length = decode_size_description(
+        "30L", Locale.UK, product_type=ProductType.TROUSERS
+    )
     assert length.format_id == "waist-length"
     assert length.sizes[1].raw == "long"
     assert encode_size_description(length.sizes, Locale.UK).text == "30L"
@@ -48,10 +53,13 @@ def test_bra_age_proportion_and_shoe_width():
     assert bra.sizes[1].raw == "DD"
 
     age = decode_size_description("5-6 yrs", Locale.UK)
-    assert age.sizes[0].raw == "5-6y"
+    assert age.sizes[0].size_unit.slug == "age-years"
+    assert age.sizes[0].raw == "5-6"
     assert age.sizes[0].display() == "5-6 years"
 
-    petite = decode_size_description("Petite", Locale.UK, product_type=ProductType.DRESSES)
+    petite = decode_size_description(
+        "Petite", Locale.UK, product_type=ProductType.DRESSES
+    )
     assert petite.sizes[0].raw == "petite"
 
     width = decode_size_description("UK 6 G", Locale.UK, product_type=ProductType.SHOES)
@@ -69,12 +77,16 @@ def test_product_type_changes_a_bare_number():
 def test_encode_prefers_region_without_converting_charts():
     uk = Size(10, UK_DRESS_SIZE)
     eu = Size(38, EU_DRESS_SIZE)
-    encoded = encode_size_description([eu, uk], Locale.EU, preferred_regions=(Locale.UK, Locale.EU))
+    encoded = encode_size_description(
+        [eu, uk], Locale.EU, preferred_regions=(Locale.UK, Locale.EU)
+    )
     assert encoded.text == "UK 10"
     assert encoded.discarded[0].reason == "duplicate"
     assert encoded.discarded[0].text == "EU 38"
 
-    only_eu = encode_size_description([eu], Locale.UK, preferred_regions=(Locale.UK, Locale.EU))
+    only_eu = encode_size_description(
+        [eu], Locale.UK, preferred_regions=(Locale.UK, Locale.EU)
+    )
     assert only_eu.text == "EU 38"
 
 
@@ -187,22 +199,23 @@ def test_bra_strings(raw, product, expected):
 
 
 @pytest.mark.parametrize(
-    ("raw", "token", "display"),
+    ("raw", "slug", "token", "display"),
     [
-        ("5-6 years", "5-6y", "5-6 years"),
-        ("5-6 yrs", "5-6y", "5-6 years"),
-        ("12Y", "12y", "12 years"),
-        ("12 years", "12y", "12 years"),
-        ("0-3 months", "0-3m", "0-3 months"),
-        ("6 mths", "6m", "6 months"),
-        ("3m", "3m", "3 months"),
-        ("1 month", "1m", "1 month"),
-        ("1 year", "1y", "1 year"),
+        ("5-6 years", "age-years", "5-6", "5-6 years"),
+        ("5-6 yrs", "age-years", "5-6", "5-6 years"),
+        ("12Y", "age-years", "12", "12 years"),
+        ("12 years", "age-years", "12", "12 years"),
+        ("0-3 months", "age-months", "0-3", "0-3 months"),
+        ("6 mths", "age-months", "6", "6 months"),
+        ("6 mth", "age-months", "6", "6 months"),
+        ("3m", "age-months", "3", "3 months"),
+        ("1 month", "age-months", "1", "1 month"),
+        ("1 year", "age-years", "1", "1 year"),
     ],
 )
-def test_age_bands(raw, token, display):
+def test_age_bands(raw, slug, token, display):
     decoded = decode_size_description(raw, Locale.UK)
-    assert decoded.sizes[0].size_unit.slug == "age"
+    assert decoded.sizes[0].size_unit.slug == slug
     assert decoded.sizes[0].raw == token
     assert decoded.sizes[0].display() == display
     assert encode_size_description(decoded.sizes, Locale.UK).text == display
@@ -288,14 +301,18 @@ def test_unrecognised_cells(raw):
 
 
 def test_product_type_rejects_a_cross_range_compound():
-    dresses = decode_size_description("30/32", Locale.UK, product_type=ProductType.DRESSES)
+    dresses = decode_size_description(
+        "30/32", Locale.UK, product_type=ProductType.DRESSES
+    )
     jeans = decode_size_description("30/32", Locale.UK, product_type=ProductType.JEANS)
     assert jeans.format_id == "waist-leg"
     assert dresses.format_id != "waist-leg"
 
 
 def test_ambiguous_string_lowers_confidence_and_lists_alternatives():
-    decoded = decode_size_description("UK 10", Locale.UK, product_type=ProductType.DRESSES)
+    decoded = decode_size_description(
+        "UK 10", Locale.UK, product_type=ProductType.DRESSES
+    )
     assert "regional-number" in decoded.alternatives
     assert decoded.confidence <= 0.6
 
@@ -309,7 +326,10 @@ def test_label_synonyms_round_trip_through_size():
     assert Size("G", SHOE_WIDTH_SIZE).raw == "wide"
     assert Size("medium", SHOE_WIDTH_SIZE).raw == "standard"
     assert Size("pt", PROPORTION_SIZE).raw == "petite"
-    assert Size("5-6y", AGE_SIZE).display() == "5-6 years"
+    assert Size("5-6", AGE_YEARS_SIZE).display() == "5-6 years"
+    assert Size("6 mths", AGE_MONTHS_SIZE).raw == "6"
+    assert Size("6 months", AGE_MONTHS_SIZE).raw == "6"
+    assert Size("6m", AGE_MONTHS_SIZE).raw == "6"
     with pytest.raises(ValueError):
         Size("banana", TROUSER_LENGTH_SIZE)
 
@@ -377,7 +397,8 @@ def test_inch_waist_accepts_w_prefix(raw):
         (TROUSER_LENGTH_SIZE, "Regular"),
         (SHOE_WIDTH_SIZE, "extra wide"),
         (PROPORTION_SIZE, "Petite"),
-        (AGE_SIZE, "9-12 months"),
+        (AGE_MONTHS_SIZE, "9-12 months"),
+        (AGE_YEARS_SIZE, "9-12 years"),
     ],
 )
 def test_unit_pattern_extracts_the_sample(unit, sample):
@@ -396,7 +417,10 @@ def test_unit_pattern_extracts_the_sample(unit, sample):
 def test_encode_length_follows_preferred_region_unit():
     inches = Size(30, INCH_WAIST_SIZE)
     as_eu = encode_size_description(
-        [inches], Locale.UK, preferred_regions=(Locale.EU,), product_type=ProductType.JEANS
+        [inches],
+        Locale.UK,
+        preferred_regions=(Locale.EU,),
+        product_type=ProductType.JEANS,
     )
     assert as_eu.used[0].size_unit.length_unit == "cm"
     assert "cm" in as_eu.text
@@ -455,7 +479,7 @@ def test_encode_named_formats():
     assert shoe.format_id == "shoe"
     assert shoe.text == "UK 6 Wide"
 
-    age = encode_size_description([Size("0-3 months", AGE_SIZE)], Locale.UK)
+    age = encode_size_description([Size("0-3 months", AGE_MONTHS_SIZE)], Locale.UK)
     assert age.text == "0-3 months"
     assert age.format_id == "age"
 
@@ -514,7 +538,9 @@ def test_whitespace_is_collapsed_before_matching():
 
 
 def test_jeans_slash_round_trips():
-    decoded = decode_size_description("W32 / L30", Locale.UK, product_type=ProductType.JEANS)
+    decoded = decode_size_description(
+        "W32 / L30", Locale.UK, product_type=ProductType.JEANS
+    )
     assert _ids(decoded) == [
         ("in-waist-size", "32"),
         ("in-trousers-inseam", "30"),

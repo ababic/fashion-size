@@ -20,8 +20,8 @@ from decimal import Decimal, InvalidOperation
 from fashion_size.demographics import AgeGroup, Demographic, Gender
 from fashion_size.product_types import ProductType
 from fashion_size.types import (
-    AGE,
-    AGE_SIZE,
+    AGE_MONTHS_SIZE,
+    AGE_YEARS_SIZE,
     AU_ADULT_SHOE_SIZE,
     AU_DRESS_SIZE,
     CM_COLLAR_SIZE,
@@ -719,15 +719,25 @@ def _parse_shoe_width(
     return None
 
 
+_AGE_UNITS = (AGE_MONTHS_SIZE, AGE_YEARS_SIZE)
+
+
+_AGE_UNIT_WORD = re.compile(
+    r"\d\s*(?:months?|mths?|mth|m|years?|yrs?|yr|y)\b",
+    re.IGNORECASE,
+)
+
+
 def _parse_age(text: str, region: Locale, product: ProductType | None) -> _Hit | None:
-    try:
-        token = Size(text, AGE_SIZE).raw
-    except ValueError:
+    if _AGE_UNIT_WORD.search(text) is None:
         return None
-    if not isinstance(token, str):
-        return None
-    score = 0.93
-    return _Hit("age", (Size(token, AGE_SIZE),), score)
+    for unit in _AGE_UNITS:
+        try:
+            size = Size(text, unit)
+        except ValueError:
+            continue
+        return _Hit("age", (size,), 0.93)
+    return None
 
 
 _PARSERS = (
@@ -761,8 +771,8 @@ def _length_unit_for_region(region: Locale) -> str:
 
 def _render_label(size: Size, region: Locale) -> str:
     token = str(size.raw)
-    if size.size_type.slug == AGE.slug:
-        return label_display(AGE, token)
+    if size.size_type.slug in {"age-months", "age-years"}:
+        return label_display(size.size_type, token)
     words = _REGION_WORDS.get(token, {})
     return words.get(region, label_display(size.size_type, token))
 
@@ -880,7 +890,7 @@ def _candidate_formats(
         found.append("bra")
     if product in _FOOTWEAR and ("adult-shoe" in slugs or "shoe-width" in slugs):
         found.append("shoe")
-    if "age" in slugs and len(slugs) == 1:
+    if slugs <= {"age-months", "age-years"} and slugs:
         found.append("age")
     if "proportion" in slugs and slugs <= {"proportion", "dress"}:
         found.append("proportion")
@@ -945,7 +955,11 @@ def _encode_shoe(sizes: tuple[Size, ...], region: Locale, source: Locale):
 
 
 def _encode_age(sizes: tuple[Size, ...], region: Locale, source: Locale):
-    age = next(size for size in sizes if size.size_type.slug == AGE.slug)
+    age = next(
+        size
+        for size in sizes
+        if size.size_type.slug in {"age-months", "age-years"}
+    )
     return age.display(), (age,), ()
 
 
