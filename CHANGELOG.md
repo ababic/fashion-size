@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Label size types `trouser-length`, `top-length`, `shoe-width`, `proportion`, and `age`. Tokens are canonical (`regular`, `extra-wide`, `5-6y`) with shorthand synonyms. They do not use conversion charts.
+- `fashion_size.descriptions.decode_size_description` and `encode_size_description` recognise feed size strings and join size values back into one string. The module is not imported with the package. Chart sizes stay in the region they were found in. Length values can move between inches and centimetres for a preferred region. Results include a confidence score and discarded tokens.
+
 ## 2026.10.17
 
 - `shorts-inseam` and `trousers-inseam` length size types with non-overlapping inch bounds 2–22 and 24–42 (retail-aligned, with headroom for long shorts and big-and-tall trousers). Formula conversion rejects values outside each type's range. Generic `inside-leg` keeps the 5–150 inch clothing range.

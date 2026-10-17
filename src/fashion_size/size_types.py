@@ -24,3 +24,8 @@ class SizeTypeSlug(StrEnum):
     SHORTS_INSEAM = "shorts-inseam"
     TROUSERS_INSEAM = "trousers-inseam"
     COLLAR = "collar"
+    TROUSER_LENGTH = "trouser-length"
+    TOP_LENGTH = "top-length"
+    SHOE_WIDTH = "shoe-width"
+    PROPORTION = "proportion"
+    AGE = "age"

@@ -42,8 +42,27 @@ The source repository is [github.com/ababic/fashion-size](https://github.com/aba
 | Chest label (`chest-size`) | `uk-chest-size`, `eu-chest-size`, `us-chest-size`, `au-chest-size` (`fr-chest-size` resolves to EU) | Brand-variable chart lookup | UK/US/AU chest labels are inch-based. EU chest is a shared regional unit: adult rows use continental labels, while child rows use centimetres. French chest labels match EU. |
 | Body measurements (`chest`, `waist`, `collar`) | `cm-chest-size`, `in-waist-size`, `in-collar-size`, etc. | Fixed formula conversion | Tape-measure style values in `in`/`cm`. Bounds: chest 18–88, waist 16–85, collar 11–28 (children through big-and-tall, with headroom). Each exposes `length_range` on the size type. |
 | Leg length / inseam (`inside-leg`, `shorts-inseam`, `trousers-inseam`) | `in-inside-leg`, `in-shorts-inseam`, `in-trousers-inseam`, and `cm-*` pairs | Fixed formula conversion | Garment inside-leg / inseam in `in`/`cm`. Prefer `shorts-inseam` (2–22 in) or `trousers-inseam` (24–42 in) on product data so values cannot sit on the wrong attribute. Generic `inside-leg` / `leg-length` accepts 2–42 in when the catalog has not split shorts vs trousers. |
+| Label sizes (`trouser-length`, `top-length`, `shoe-width`, `proportion`, `age`) | one universal unit per type (`trouser-length`, `shoe-width`, …) | None | Sold-as words and age bands. `raw` is a canonical token (`regular`, `extra-wide`, `5-6y`). Synonyms fold in (`R`, `std`, `mths`). They are not on locale charts. |
 
 Today, shipped brand overrides are concentrated in selected dress and shoe charts. Types still marked as brand-variable above continue to fall back to default scales when no matching brand chart exists for the brand, demographic, product type, and `as_of` capture instant.
+
+## Size description strings
+
+`fashion_size.descriptions` is imported only when you call it. It recognises common feed strings and joins size values back into one string. Chart sizes stay in the region they were written in. Length values can move between inches and centimetres. Label wording follows `preferred_regions`.
+
+```python
+from fashion_size.descriptions import decode_size_description, encode_size_description
+from fashion_size.product_types import ProductType
+
+decoded = decode_size_description("30/32", "uk", product_type=ProductType.JEANS)
+decoded.format_id  # "waist-leg"
+decoded.confidence
+decoded.sizes
+
+encode_size_description(decoded.sizes, "uk", preferred_regions=("uk", "eu")).text
+```
+
+`confidence` drops when another format was also plausible. `discarded` lists tokens that were duplicates or not recognised. `preferred_regions` works like a catalog import preference list: the first region that is already present wins. Omit it and `source_region` is used.
 
 ## Brand charts
 
