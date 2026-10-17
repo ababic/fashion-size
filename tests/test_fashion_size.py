@@ -406,8 +406,16 @@ def test_garment_inseam_length_bounds():
     assert trousers is not None and trousers.raw == Decimal("81")
     assert size_from_attribute_option("in-shorts-inseam", '30"') is None
 
+    assert SHORTS_INSEAM.length_range_start == Decimal("2")
+    assert SHORTS_INSEAM.length_range_stop == Decimal("22")
+    assert SHORTS_INSEAM.clothing_length_range is not None
+    assert INCH_SHORTS_INSEAM.clothing_length_range == SHORTS_INSEAM.clothing_length_range
+    assert INSIDE_LEG.length_range_start == Decimal("5")
+    assert UK_DRESS_SIZE.size_type.length_range_start is None
+
     bounds = clothing_length_entry_bounds(SHORTS_INSEAM)
-    assert bounds.min_inches == Decimal("2") and bounds.max_inches == Decimal("22")
+    assert bounds.min_inches == SHORTS_INSEAM.length_range_start
+    assert bounds.max_inches == SHORTS_INSEAM.length_range_stop
     assert bounds.min_centimetres == Decimal("5.08")
     assert clothing_length_value_in_range(5, INCH_SHORTS_INSEAM)
     assert not clothing_length_value_in_range(30, INCH_SHORTS_INSEAM)

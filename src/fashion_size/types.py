@@ -415,6 +415,28 @@ def format_age_gender(age_group: str, gender: str) -> str:
     return f"{age_group_label(age_group)} / {gender_label(gender)}"
 
 
+CLOTHING_LENGTH_MIN_INCHES = Decimal("5")
+CLOTHING_LENGTH_MAX_INCHES = Decimal("150")
+# Matches ``fashion_size.conversion.CM_PER_INCH`` (kept here to avoid import cycles).
+CLOTHING_LENGTH_CM_PER_INCH = Decimal("2.54")
+
+
+@dataclass(frozen=True, slots=True)
+class ClothingLengthRange:
+    """Inclusive formula-length bounds for one size type (not from locale charts)."""
+
+    start_inches: Decimal
+    stop_inches: Decimal
+
+    @property
+    def start_centimetres(self) -> Decimal:
+        return self.start_inches * CLOTHING_LENGTH_CM_PER_INCH
+
+    @property
+    def stop_centimetres(self) -> Decimal:
+        return self.stop_inches * CLOTHING_LENGTH_CM_PER_INCH
+
+
 @dataclass(frozen=True, slots=True)
 class SizeType:
     """Fine-grained size category (dress, adult shoe, chest, …).
@@ -440,6 +462,26 @@ class SizeType:
     def supports_brand_overrides(self) -> bool:
         return self.family.supports_brand_overrides
 
+    @property
+    def clothing_length_range(self) -> ClothingLengthRange | None:
+        """Resolved inch range for formula length types, or ``None`` for chart types."""
+        if self.family != SizeFamily.LENGTH:
+            return None
+        start, stop = self.clothing_length_inch_bounds()
+        return ClothingLengthRange(start_inches=start, stop_inches=stop)
+
+    @property
+    def length_range_start(self) -> Decimal | None:
+        """Inclusive range start in inches, or ``None`` when bounds do not apply."""
+        clothing_range = self.clothing_length_range
+        return None if clothing_range is None else clothing_range.start_inches
+
+    @property
+    def length_range_stop(self) -> Decimal | None:
+        """Inclusive range stop in inches, or ``None`` when bounds do not apply."""
+        clothing_range = self.clothing_length_range
+        return None if clothing_range is None else clothing_range.stop_inches
+
     def clothing_length_inch_bounds(self) -> tuple[Decimal, Decimal]:
         if self.family != SizeFamily.LENGTH:
             raise ValueError(
@@ -456,10 +498,6 @@ class SizeType:
 
     def __str__(self) -> str:
         return self.label
-
-
-CLOTHING_LENGTH_MIN_INCHES = Decimal("5")
-CLOTHING_LENGTH_MAX_INCHES = Decimal("150")
 
 
 DRESS = SizeType(
@@ -597,14 +635,16 @@ class ClothingLengthEntryBounds:
 
 def clothing_length_entry_bounds(size_type: SizeType) -> ClothingLengthEntryBounds:
     """Return inch and centimetre limits for a length size type's entry controls."""
-    min_inches, max_inches = size_type.clothing_length_inch_bounds()
-    from fashion_size.conversion import CM_PER_INCH
-
+    clothing_range = size_type.clothing_length_range
+    if clothing_range is None:
+        raise ValueError(
+            f"{size_type.label} is not a length size type — entry bounds do not apply."
+        )
     return ClothingLengthEntryBounds(
-        min_inches=min_inches,
-        max_inches=max_inches,
-        min_centimetres=min_inches * CM_PER_INCH,
-        max_centimetres=max_inches * CM_PER_INCH,
+        min_inches=clothing_range.start_inches,
+        max_inches=clothing_range.stop_inches,
+        min_centimetres=clothing_range.start_centimetres,
+        max_centimetres=clothing_range.stop_centimetres,
     )
 
 
@@ -709,6 +749,11 @@ class SizeUnit:
     @property
     def supports_brand_overrides(self) -> bool:
         return self.size_type.supports_brand_overrides
+
+    @property
+    def clothing_length_range(self) -> ClothingLengthRange | None:
+        """Resolved inch range for this unit's size type, if it is a formula length."""
+        return self.size_type.clothing_length_range
 
     def can_convert_to(self, other: SizeUnit) -> bool:
         return self.size_type.slug == other.size_type.slug
