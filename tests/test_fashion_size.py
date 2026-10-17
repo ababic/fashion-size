@@ -413,7 +413,8 @@ def test_garment_inseam_length_bounds():
     assert SHORTS_INSEAM.length_range_stop == Decimal("22")
     assert SHORTS_INSEAM.length_range is not None
     assert INCH_SHORTS_INSEAM.length_range == SHORTS_INSEAM.length_range
-    assert INSIDE_LEG.length_range_start == Decimal("15")
+    assert INSIDE_LEG.length_range_start == Decimal("2")
+    assert INSIDE_LEG.length_range_stop == Decimal("42")
     assert CHEST.length_range_start == Decimal("18")
     assert WAIST.length_range_stop == Decimal("85")
     assert COLLAR.length_range_stop == Decimal("28")
@@ -426,7 +427,10 @@ def test_garment_inseam_length_bounds():
     assert length_value_in_range(5, INCH_SHORTS_INSEAM)
     assert not length_value_in_range(30, INCH_SHORTS_INSEAM)
 
-    assert length_size_types_for_inches(10) == (SHORTS_INSEAM,)
+    assert length_size_types_for_inches(10) == (
+        SHORTS_INSEAM,
+        INSIDE_LEG,
+    )
     assert len(length_size_types_for_inches(10, candidates=())) == 0
     assert length_size_types_for_inches(32) == (
         TROUSERS_INSEAM,

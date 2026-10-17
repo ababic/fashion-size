@@ -575,13 +575,14 @@ WAIST = SizeType(
     length_min_inches=Decimal("16"),
     length_max_inches=Decimal("85"),
 )
+# Generic inseam / inside-leg when the catalog does not split shorts vs trousers.
 INSIDE_LEG = SizeType(
     SizeTypeSlug.INSIDE_LEG,
     SizeFamily.LENGTH,
     "Inside leg",
     ("inside-leg", "leg-length"),
-    length_min_inches=Decimal("15"),
-    length_max_inches=Decimal("50"),
+    length_min_inches=Decimal("2"),
+    length_max_inches=Decimal("42"),
 )
 # Inseam bounds follow common retail spans (athletic/bermuda shorts through big &
 # tall long cargo ~18 in) with headroom to 22 in for long-short SKUs. Trousers

@@ -7,7 +7,7 @@
 - `shorts-inseam` and `trousers-inseam` length size types with non-overlapping inch bounds 2–22 and 24–42 (retail-aligned, with headroom for long shorts and big-and-tall trousers). Formula conversion rejects values outside each type's range. Generic `inside-leg` keeps the 5–150 inch clothing range.
 - `LengthRange` on each length `SizeType` via `length_range`, plus `length_range_start` and `length_range_stop` (and the same on `SizeUnit`), so hosts can read inclusive bounds without locale charts.
 - `length_entry_bounds`, `length_value_in_range`, and `length_size_types_for_inches` / `length_size_types_for_measurement` for form min/max and inferring which length attribute a raw value might represent. `size_from_attribute_option` rejects out-of-range length values.
-- Realistic inch bounds on body measurement length types: chest 18–88, waist 16–85, inside leg 15–50, collar 11–28 (replacing the generic 5–150 window on those types).
+- Realistic inch bounds on formula length types: chest 18–88, waist 16–85, collar 11–28; generic `inside-leg` 2–42 in (inseam span when shorts/trousers are not split).
 - Brand and default conversion charts keep earlier generations. `effective_from` is when a chart's rows start to apply. `effective_until` is the next chart's start for the same size type, demographic, and product types. `chart_for`, `Size.convert`, and `Size.convert_to_locale` take optional `as_of`, the instant the raw size was captured. Omit it to use the latest matching brand chart generation and the current default chart. A capture time before a brand's first override uses the default chart. Loaded brand charts include their catalog `id`.
 - The release workflow publishes a `v*` tag only when that commit is on `main` or a `release-*` branch.
 
