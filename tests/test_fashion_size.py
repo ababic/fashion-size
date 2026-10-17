@@ -55,9 +55,13 @@ from fashion_size.types import (
     EU_DRESS_SIZE,
     EU_WAIST_SIZE,
     FR_BAND_SIZE,
+    GARMENT_INSEAM_SIZE_TYPES,
     INCH_CHEST_SIZE,
     INCH_SHORTS_INSEAM,
     INCH_TROUSERS_INSEAM,
+    INSIDE_LEG,
+    SHORTS_INSEAM,
+    TROUSERS_INSEAM,
     UK_ADULT_SHOE_SIZE,
     UK_BABY_SHOE_SIZE,
     UK_BAND_SIZE,
@@ -75,6 +79,10 @@ from fashion_size.types import (
     MissingScaleError,
     Size,
     UnknownSizeError,
+    clothing_length_entry_bounds,
+    clothing_length_size_types_for_inches,
+    clothing_length_size_types_for_measurement,
+    clothing_length_value_in_range,
     parse_size_unit_slug,
     size_from_attribute_option,
     size_unit_choices_for_type,
@@ -378,6 +386,29 @@ def test_garment_inseam_length_bounds():
     assert shorts is not None and shorts.size_unit is INCH_SHORTS_INSEAM
     trousers = size_from_attribute_option("cm-trousers-inseam", "81cm")
     assert trousers is not None and trousers.raw == Decimal("81")
+    assert size_from_attribute_option("in-shorts-inseam", '30"') is None
+
+    bounds = clothing_length_entry_bounds(SHORTS_INSEAM)
+    assert bounds.min_inches == Decimal("3") and bounds.max_inches == Decimal("26")
+    assert bounds.min_centimetres == Decimal("7.62")
+    assert clothing_length_value_in_range(5, INCH_SHORTS_INSEAM)
+    assert not clothing_length_value_in_range(30, INCH_SHORTS_INSEAM)
+
+    assert clothing_length_size_types_for_inches(10) == (
+        SHORTS_INSEAM,
+        INSIDE_LEG,
+    )
+    assert len(clothing_length_size_types_for_inches(10, candidates=())) == 0
+    assert clothing_length_size_types_for_inches(32) == (
+        TROUSERS_INSEAM,
+        INSIDE_LEG,
+    )
+    at_twenty_six = clothing_length_size_types_for_inches(26)
+    assert at_twenty_six[:2] == (TROUSERS_INSEAM, SHORTS_INSEAM)
+    assert INSIDE_LEG in at_twenty_six
+    assert clothing_length_size_types_for_measurement(
+        81, unit="cm", candidates=GARMENT_INSEAM_SIZE_TYPES
+    ) == (TROUSERS_INSEAM,)
 
 
 def test_waist_chest_and_band_measurements_display_like_length():
