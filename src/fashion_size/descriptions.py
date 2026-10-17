@@ -338,6 +338,28 @@ def decode_size_description(
 
 _LETTER_PREFIX = re.compile(r"\(\?<!\[A-Za-z\]\)[WL]")
 
+# Context that looks like a size token but is a quantity, a year, a collection
+# name, or a garment phrase. A recognition match that sits inside one of these
+# is not a size.
+_EXCEPTION_PATTERNS = (
+    re.compile(r"\b\d+\s*-?\s*packs?\b", re.IGNORECASE),
+    re.compile(r"\bpacks?\s+of\s+\d+\b", re.IGNORECASE),
+    re.compile(r"\b(?:19|20)\d{2}\b"),
+    re.compile(r"\bpetite\s+(?:edit|collection|range|line)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:extra[\s-]+)?(?:long|short)\s+sleeves?\b",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _overlaps_exception(text: str, start: int, end: int) -> bool:
+    for pattern in _EXCEPTION_PATTERNS:
+        for found in pattern.finditer(text):
+            if found.start() < end and found.end() > start:
+                return True
+    return False
+
 
 def _parse_from_units(
     text: str, region: Locale, product: ProductType | None
@@ -358,6 +380,8 @@ def _parse_from_units(
                 if re.search(r"[-–]\s*$", text[:value_at]) or _RANGE_TAIL.match(
                     text[match.end() :]
                 ):
+                    continue
+                if _overlaps_exception(text, match.start(), match.end()):
                     continue
                 if unit.size_type.family is SizeFamily.CUP_SIZE and not _cup_span_ok(
                     text, match

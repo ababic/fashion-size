@@ -140,6 +140,38 @@ def test_ranges_are_not_sizes():
     assert any(item.reason == "range" for item in mixed.discarded)
 
 
+@pytest.mark.parametrize(
+    ("text", "product"),
+    [
+        ("2 pack socks", ProductType.DRESSES),
+        ("pack of 3", ProductType.TROUSERS),
+        ("Navy dress 2024", ProductType.DRESSES),
+        ("The Petite Edit dress", ProductType.DRESSES),
+        ("extra long sleeve tee", ProductType.CASUAL_TOPS),
+    ],
+)
+def test_exception_patterns_are_not_sizes(text, product):
+    decoded = decode_size_description(text, Locale.UK, product_type=product)
+    assert decoded.sizes == ()
+
+
+def test_real_size_tokens_survive_exception_patterns():
+    assert decode_size_description(
+        "Petite", Locale.UK, product_type=ProductType.DRESSES
+    ).sizes
+    assert decode_size_description(
+        "extra long", Locale.UK, product_type=ProductType.TROUSERS
+    ).sizes
+    assert (
+        decode_size_description(
+            "Navy midi dress UK 10", Locale.UK, product_type=ProductType.DRESSES
+        )
+        .sizes[0]
+        .raw
+        == 10
+    )
+
+
 def test_dress_fit_code_and_shirt_collar_sleeve():
     dress = decode_size_description("16T", Locale.UK, product_type=ProductType.DRESSES)
     assert [size.raw for size in dress.sizes] == [16, "tall"]
