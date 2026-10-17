@@ -415,14 +415,14 @@ def format_age_gender(age_group: str, gender: str) -> str:
     return f"{age_group_label(age_group)} / {gender_label(gender)}"
 
 
-CLOTHING_LENGTH_MIN_INCHES = Decimal("5")
-CLOTHING_LENGTH_MAX_INCHES = Decimal("150")
+DEFAULT_LENGTH_MIN_INCHES = Decimal("5")
+DEFAULT_LENGTH_MAX_INCHES = Decimal("150")
 # Matches ``fashion_size.conversion.CM_PER_INCH`` (kept here to avoid import cycles).
-CLOTHING_LENGTH_CM_PER_INCH = Decimal("2.54")
+LENGTH_CM_PER_INCH = Decimal("2.54")
 
 
 @dataclass(frozen=True, slots=True)
-class ClothingLengthRange:
+class LengthRange:
     """Inclusive formula-length bounds for one size type (not from locale charts)."""
 
     start_inches: Decimal
@@ -430,11 +430,11 @@ class ClothingLengthRange:
 
     @property
     def start_centimetres(self) -> Decimal:
-        return self.start_inches * CLOTHING_LENGTH_CM_PER_INCH
+        return self.start_inches * LENGTH_CM_PER_INCH
 
     @property
     def stop_centimetres(self) -> Decimal:
-        return self.stop_inches * CLOTHING_LENGTH_CM_PER_INCH
+        return self.stop_inches * LENGTH_CM_PER_INCH
 
 
 @dataclass(frozen=True, slots=True)
@@ -453,8 +453,8 @@ class SizeType:
     slug_stem: str = ""
     # Inclusive inch bounds for ``SizeFamily.LENGTH`` types. Hosts use these for
     # min/max on size entry fields and to infer which length attribute a number
-    # might belong to. ``None`` uses ``CLOTHING_LENGTH_MIN_INCHES`` /
-    # ``CLOTHING_LENGTH_MAX_INCHES`` (chest, waist, collar, inside leg).
+    # might belong to. ``None`` uses ``DEFAULT_LENGTH_MIN_INCHES`` /
+    # ``DEFAULT_LENGTH_MAX_INCHES`` (chest, waist, collar, inside leg).
     length_min_inches: Decimal | None = None
     length_max_inches: Decimal | None = None
 
@@ -463,26 +463,26 @@ class SizeType:
         return self.family.supports_brand_overrides
 
     @property
-    def clothing_length_range(self) -> ClothingLengthRange | None:
+    def length_range(self) -> LengthRange | None:
         """Resolved inch range for formula length types, or ``None`` for chart types."""
         if self.family != SizeFamily.LENGTH:
             return None
-        start, stop = self.clothing_length_inch_bounds()
-        return ClothingLengthRange(start_inches=start, stop_inches=stop)
+        start, stop = self.length_inch_bounds()
+        return LengthRange(start_inches=start, stop_inches=stop)
 
     @property
     def length_range_start(self) -> Decimal | None:
         """Inclusive range start in inches, or ``None`` when bounds do not apply."""
-        clothing_range = self.clothing_length_range
-        return None if clothing_range is None else clothing_range.start_inches
+        resolved = self.length_range
+        return None if resolved is None else resolved.start_inches
 
     @property
     def length_range_stop(self) -> Decimal | None:
         """Inclusive range stop in inches, or ``None`` when bounds do not apply."""
-        clothing_range = self.clothing_length_range
-        return None if clothing_range is None else clothing_range.stop_inches
+        resolved = self.length_range
+        return None if resolved is None else resolved.stop_inches
 
-    def clothing_length_inch_bounds(self) -> tuple[Decimal, Decimal]:
+    def length_inch_bounds(self) -> tuple[Decimal, Decimal]:
         if self.family != SizeFamily.LENGTH:
             raise ValueError(
                 f"{self.label} is not a length size type — inch bounds do not apply."
@@ -490,10 +490,10 @@ class SizeType:
         return (
             self.length_min_inches
             if self.length_min_inches is not None
-            else CLOTHING_LENGTH_MIN_INCHES,
+            else DEFAULT_LENGTH_MIN_INCHES,
             self.length_max_inches
             if self.length_max_inches is not None
-            else CLOTHING_LENGTH_MAX_INCHES,
+            else DEFAULT_LENGTH_MAX_INCHES,
         )
 
     def __str__(self) -> str:
@@ -624,7 +624,7 @@ LENGTH_SIZE_TYPES: tuple[SizeType, ...] = tuple(
 
 
 @dataclass(frozen=True, slots=True)
-class ClothingLengthEntryBounds:
+class LengthEntryBounds:
     """Inclusive min/max for one length size type (forms, sliders, validation)."""
 
     min_inches: Decimal
@@ -633,35 +633,35 @@ class ClothingLengthEntryBounds:
     max_centimetres: Decimal
 
 
-def clothing_length_entry_bounds(size_type: SizeType) -> ClothingLengthEntryBounds:
+def length_entry_bounds(size_type: SizeType) -> LengthEntryBounds:
     """Return inch and centimetre limits for a length size type's entry controls."""
-    clothing_range = size_type.clothing_length_range
-    if clothing_range is None:
+    resolved = size_type.length_range
+    if resolved is None:
         raise ValueError(
             f"{size_type.label} is not a length size type — entry bounds do not apply."
         )
-    return ClothingLengthEntryBounds(
-        min_inches=clothing_range.start_inches,
-        max_inches=clothing_range.stop_inches,
-        min_centimetres=clothing_range.start_centimetres,
-        max_centimetres=clothing_range.stop_centimetres,
+    return LengthEntryBounds(
+        min_inches=resolved.start_inches,
+        max_inches=resolved.stop_inches,
+        min_centimetres=resolved.start_centimetres,
+        max_centimetres=resolved.stop_centimetres,
     )
 
 
-def clothing_length_in_inch_range(
+def length_in_inch_range(
     size_type: SizeType, inches: int | float | str | Decimal
 ) -> bool:
-    """Whether ``inches`` fits the size type's inclusive clothing-length bounds."""
+    """Whether ``inches`` fits the size type's inclusive length bounds."""
     if size_type.family != SizeFamily.LENGTH:
         raise ValueError(
             f"{size_type.label} is not a length size type — inch bounds do not apply."
         )
     value = normalize_length_raw(inches)
-    min_inches, max_inches = size_type.clothing_length_inch_bounds()
+    min_inches, max_inches = size_type.length_inch_bounds()
     return min_inches <= value <= max_inches
 
 
-def _inches_from_clothing_length_measurement(
+def _inches_from_length_measurement(
     raw: int | float | str | Decimal, *, unit: str
 ) -> Decimal:
     value = normalize_length_raw(raw)
@@ -675,7 +675,7 @@ def _inches_from_clothing_length_measurement(
     raise ValueError(f"Unknown length unit {unit!r}.")
 
 
-def clothing_length_value_in_range(
+def length_value_in_range(
     raw: int | float | str | Decimal, size_unit: SizeUnit
 ) -> bool:
     """Whether a typed length value fits the size unit's inch bounds."""
@@ -685,13 +685,13 @@ def clothing_length_value_in_range(
         )
     if not size_unit.length_unit:
         raise ValueError(f"{size_unit.label} is not a centimetre or inch size unit.")
-    inches = _inches_from_clothing_length_measurement(
+    inches = _inches_from_length_measurement(
         raw, unit=size_unit.length_unit
     )
-    return clothing_length_in_inch_range(size_unit.size_type, inches)
+    return length_in_inch_range(size_unit.size_type, inches)
 
 
-def clothing_length_size_types_for_inches(
+def length_size_types_for_inches(
     inches: int | float | str | Decimal,
     *,
     candidates: tuple[SizeType, ...] | None = None,
@@ -706,28 +706,28 @@ def clothing_length_size_types_for_inches(
     pool = LEG_LENGTH_SIZE_TYPES if candidates is None else candidates
 
     def span(size_type: SizeType) -> Decimal:
-        lo, hi = size_type.clothing_length_inch_bounds()
+        lo, hi = size_type.length_inch_bounds()
         return hi - lo
 
     matches = [
         size_type
         for size_type in pool
         if size_type.family == SizeFamily.LENGTH
-        and clothing_length_in_inch_range(size_type, value)
+        and length_in_inch_range(size_type, value)
     ]
     matches.sort(key=span)
     return tuple(matches)
 
 
-def clothing_length_size_types_for_measurement(
+def length_size_types_for_measurement(
     raw: int | float | str | Decimal,
     *,
     unit: Literal["in", "cm"],
     candidates: tuple[SizeType, ...] | None = None,
 ) -> tuple[SizeType, ...]:
-    """Like ``clothing_length_size_types_for_inches`` for a cm or inch measurement."""
-    inches = _inches_from_clothing_length_measurement(raw, unit=unit)
-    return clothing_length_size_types_for_inches(inches, candidates=candidates)
+    """Like ``length_size_types_for_inches`` for a cm or inch measurement."""
+    inches = _inches_from_length_measurement(raw, unit=unit)
+    return length_size_types_for_inches(inches, candidates=candidates)
 
 
 @dataclass(frozen=True, slots=True)
@@ -751,9 +751,9 @@ class SizeUnit:
         return self.size_type.supports_brand_overrides
 
     @property
-    def clothing_length_range(self) -> ClothingLengthRange | None:
+    def length_range(self) -> LengthRange | None:
         """Resolved inch range for this unit's size type, if it is a formula length."""
-        return self.size_type.clothing_length_range
+        return self.size_type.length_range
 
     def can_convert_to(self, other: SizeUnit) -> bool:
         return self.size_type.slug == other.size_type.slug
@@ -1133,7 +1133,7 @@ def size_from_attribute_option(
                 return Size(raw=token, size_unit=size_unit)
         if size_unit.size_type.family == SizeFamily.LENGTH:
             raw = normalize_length_raw(text)
-            if not clothing_length_value_in_range(raw, size_unit):
+            if not length_value_in_range(raw, size_unit):
                 return None
             return Size(raw=raw, size_unit=size_unit)
         return Size(raw=normalize_raw(text), size_unit=size_unit)

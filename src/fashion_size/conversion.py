@@ -268,9 +268,9 @@ def _inches_from_length(raw: Decimal, source: SizeUnit) -> Decimal:
     raise IncompatibleSizeError(f"Cannot read length from {source.label}.")
 
 
-def _assert_clothing_length_range(raw: Decimal, source: SizeUnit) -> None:
+def _assert_length_range(raw: Decimal, source: SizeUnit) -> None:
     inches = _inches_from_length(raw, source)
-    min_inches, max_inches = source.size_type.clothing_length_inch_bounds()
+    min_inches, max_inches = source.size_type.length_inch_bounds()
     if inches < min_inches or inches > max_inches:
         raise LengthOutOfRangeError(
             f"Length {format_raw(raw)}{source.display_suffix or ''} is outside the "
@@ -284,7 +284,7 @@ def _convert_length(raw: Decimal, source: SizeUnit, target: SizeUnit) -> Decimal
         raise IncompatibleSizeError(
             f"Cannot convert length between {source.label} and {target.label}."
         )
-    _assert_clothing_length_range(raw, source)
+    _assert_length_range(raw, source)
     if source.length_unit == "in" and target.length_unit == "cm":
         return raw * CM_PER_INCH
     if source.length_unit == "cm" and target.length_unit == "in":

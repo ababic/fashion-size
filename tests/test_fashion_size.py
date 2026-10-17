@@ -79,10 +79,10 @@ from fashion_size.types import (
     MissingScaleError,
     Size,
     UnknownSizeError,
-    clothing_length_entry_bounds,
-    clothing_length_size_types_for_inches,
-    clothing_length_size_types_for_measurement,
-    clothing_length_value_in_range,
+    length_entry_bounds,
+    length_size_types_for_inches,
+    length_size_types_for_measurement,
+    length_value_in_range,
     parse_size_unit_slug,
     size_from_attribute_option,
     size_unit_choices_for_type,
@@ -408,37 +408,37 @@ def test_garment_inseam_length_bounds():
 
     assert SHORTS_INSEAM.length_range_start == Decimal("2")
     assert SHORTS_INSEAM.length_range_stop == Decimal("22")
-    assert SHORTS_INSEAM.clothing_length_range is not None
-    assert INCH_SHORTS_INSEAM.clothing_length_range == SHORTS_INSEAM.clothing_length_range
+    assert SHORTS_INSEAM.length_range is not None
+    assert INCH_SHORTS_INSEAM.length_range == SHORTS_INSEAM.length_range
     assert INSIDE_LEG.length_range_start == Decimal("5")
     assert UK_DRESS_SIZE.size_type.length_range_start is None
 
-    bounds = clothing_length_entry_bounds(SHORTS_INSEAM)
+    bounds = length_entry_bounds(SHORTS_INSEAM)
     assert bounds.min_inches == SHORTS_INSEAM.length_range_start
     assert bounds.max_inches == SHORTS_INSEAM.length_range_stop
     assert bounds.min_centimetres == Decimal("5.08")
-    assert clothing_length_value_in_range(5, INCH_SHORTS_INSEAM)
-    assert not clothing_length_value_in_range(30, INCH_SHORTS_INSEAM)
+    assert length_value_in_range(5, INCH_SHORTS_INSEAM)
+    assert not length_value_in_range(30, INCH_SHORTS_INSEAM)
 
-    assert clothing_length_size_types_for_inches(10) == (
+    assert length_size_types_for_inches(10) == (
         SHORTS_INSEAM,
         INSIDE_LEG,
     )
-    assert len(clothing_length_size_types_for_inches(10, candidates=())) == 0
-    assert clothing_length_size_types_for_inches(32) == (
+    assert len(length_size_types_for_inches(10, candidates=())) == 0
+    assert length_size_types_for_inches(32) == (
         TROUSERS_INSEAM,
         INSIDE_LEG,
     )
-    assert clothing_length_size_types_for_inches(26) == (
+    assert length_size_types_for_inches(26) == (
         TROUSERS_INSEAM,
         INSIDE_LEG,
     )
-    assert clothing_length_size_types_for_inches(23) == (INSIDE_LEG,)
-    assert clothing_length_size_types_for_inches(22) == (
+    assert length_size_types_for_inches(23) == (INSIDE_LEG,)
+    assert length_size_types_for_inches(22) == (
         SHORTS_INSEAM,
         INSIDE_LEG,
     )
-    assert clothing_length_size_types_for_measurement(
+    assert length_size_types_for_measurement(
         81, unit="cm", candidates=GARMENT_INSEAM_SIZE_TYPES
     ) == (TROUSERS_INSEAM,)
 
