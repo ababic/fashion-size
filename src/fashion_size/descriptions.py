@@ -23,13 +23,18 @@ from fashion_size.types import (
     AGE_MONTHS_SIZE,
     AGE_YEARS_SIZE,
     AU_ADULT_SHOE_SIZE,
+    AU_CHEST_SIZE,
     AU_DRESS_SIZE,
+    AU_WAIST_SIZE,
     CM_COLLAR_SIZE,
     CM_WAIST_SIZE,
     CUP_TOKENS,
     EU_ADULT_SHOE_SIZE,
+    EU_CHEST_SIZE,
     EU_DRESS_SIZE,
+    EU_WAIST_SIZE,
     INCH_COLLAR_SIZE,
+    INCH_SLEEVE_SIZE,
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
     PROPORTION,
@@ -42,10 +47,14 @@ from fashion_size.types import (
     TROUSER_LENGTH_SIZE,
     UK_ADULT_SHOE_SIZE,
     UK_BAND_SIZE,
+    UK_CHEST_SIZE,
     UK_CUP_SIZE,
     UK_DRESS_SIZE,
+    UK_WAIST_SIZE,
     US_ADULT_SHOE_SIZE,
+    US_CHEST_SIZE,
     US_DRESS_SIZE,
+    US_WAIST_SIZE,
     Locale,
     Size,
     SizeFamily,
@@ -295,6 +304,10 @@ def decode_size_description(
     region = _require_locale(source_region, name="source_region")
     product = _require_product_type(product_type)
     text = " ".join((value or "").strip().split())
+    if _PURE_RANGE.fullmatch(text):
+        return DecodedSizeDescription(
+            (), None, 0.0, (DiscardedToken(text, "range"),), ()
+        )
     if not text:
         return DecodedSizeDescription((), None, 0.0, (), ())
     hits = [
@@ -337,6 +350,15 @@ def _parse_from_units(
         for pattern in patterns:
             explicit = not unit.recognition_is_fallback(pattern)
             for match in pattern.finditer(text):
+                value_at = (
+                    match.start("value")
+                    if "value" in match.groupdict()
+                    else match.start()
+                )
+                if re.search(r"[-–]\s*$", text[:value_at]) or _RANGE_TAIL.match(
+                    text[match.end() :]
+                ):
+                    continue
                 if unit.size_type.family is SizeFamily.CUP_SIZE and not _cup_span_ok(
                     text, match
                 ):
@@ -438,7 +460,10 @@ _PRODUCT_AFFINITY: dict[str, frozenset[ProductType]] = {
     "top-length": _TOPS,
     "shoe-width": _FOOTWEAR,
     "proportion": _DRESS_LIKE | _TOPS,
-    "letter": _DRESS_LIKE | _TOPS | _BOTTOMS | frozenset({ProductType.UNDERWEAR, ProductType.HOSIERY}),
+    "letter": _DRESS_LIKE
+    | _TOPS
+    | _BOTTOMS
+    | frozenset({ProductType.UNDERWEAR, ProductType.HOSIERY}),
 }
 
 
@@ -459,11 +484,179 @@ def _pick_nonoverlapping(
     for item in ordered:
         if any(not (item[1] <= kept[0] or item[0] >= kept[1]) for kept in chosen):
             continue
-        if any(kept[3].size_type.slug == item[3].size_type.slug for kept in chosen):
+        if any(
+            kept[3].size_type.slug == item[3].size_type.slug
+            and kept[3].size_unit.locale == item[3].size_unit.locale
+            for kept in chosen
+        ):
             continue
         chosen.append(item)
     chosen.sort(key=lambda item: item[0])
     return chosen
+
+
+_PURE_RANGE = re.compile(
+    rf"^(?:{_REGION_PREFIX}\s*[-:]?\s*)?{_NUM}\s*[-–]\s*{_NUM}$",
+    re.IGNORECASE,
+)
+_RANGE_TAIL = re.compile(rf"\s*[-–]\s*{_NUM}")
+_REGION_VALUE = re.compile(
+    rf"(?P<region>{_REGION_PREFIX})\s*[-:]?\s*(?P<value>{_NUM})",
+    re.IGNORECASE,
+)
+_EU_WITH_UK = re.compile(
+    rf"(?P<eu>{_NUM})\s*(?:/|\()\s*UK\s*-?\s*(?P<uk>{_NUM})\s*\)?",
+    re.IGNORECASE,
+)
+
+
+def _regional_chart_unit(
+    locale: Locale, number: Decimal, product: ProductType | None
+) -> SizeUnit:
+    resolved = Locale.EU if locale is Locale.FR else locale
+    if product in _FOOTWEAR or (
+        product is None and resolved is Locale.EU and _in_span(number, 35, 50)
+    ):
+        return _locale_shoe(resolved)
+    if product in {ProductType.OUTERWEAR, ProductType.SUITS} and _in_span(
+        number, 34, 60
+    ):
+        chest = {
+            Locale.UK: UK_CHEST_SIZE,
+            Locale.EU: EU_CHEST_SIZE,
+            Locale.US: US_CHEST_SIZE,
+            Locale.AU: AU_CHEST_SIZE,
+        }
+        return chest.get(resolved, UK_CHEST_SIZE)
+    if product in _BOTTOMS and _in_span(number, 24, 50):
+        waist = {
+            Locale.UK: UK_WAIST_SIZE,
+            Locale.EU: EU_WAIST_SIZE,
+            Locale.US: US_WAIST_SIZE,
+            Locale.AU: AU_WAIST_SIZE,
+        }
+        return waist.get(resolved, UK_WAIST_SIZE)
+    return _locale_dress(resolved)
+
+
+def _parse_regions(
+    text: str, region: Locale, product: ProductType | None
+) -> _Hit | None:
+    """Every labelled region in one cell, skipping a range such as ``UK 8-10``."""
+    discarded: list[DiscardedToken] = []
+    found: list[tuple[int, Size]] = []
+    seen: set[tuple[str, Locale]] = set()
+
+    def add(locale: Locale, raw: str, at: int) -> None:
+        number = _number(raw)
+        unit = _regional_chart_unit(locale, number, product)
+        key = (unit.size_type.slug, unit.locale)
+        if key in seen:
+            return
+        seen.add(key)
+        found.append((at, Size(number, unit)))
+
+    for match in _REGION_VALUE.finditer(text):
+        if _RANGE_TAIL.match(text[match.end() :]):
+            discarded.append(
+                DiscardedToken(match.group(0) + text[match.end() :].split()[0], "range")
+            )
+            continue
+        add(
+            _prefix_locale(match.group("region"), region),
+            match.group("value"),
+            match.start(),
+        )
+    paired = _EU_WITH_UK.search(text)
+    if paired and not _RANGE_TAIL.match(
+        text[paired.start("eu") + len(paired.group("eu")) :]
+    ):
+        add(Locale.EU, paired.group("eu"), paired.start("eu"))
+        add(Locale.UK, paired.group("uk"), paired.start("uk"))
+    found.sort(key=lambda item: item[0])
+    sizes = tuple(item[1] for item in found)
+    if len(sizes) < 2 and not discarded:
+        return None
+    if not sizes:
+        return _Hit("regions", (), 0.2, tuple(discarded))
+    score = 0.98 if discarded else (0.96 if len(sizes) > 1 else 0.7)
+    return _Hit("regions", sizes, score, tuple(discarded))
+
+
+def _parse_numbered_fit(
+    text: str, region: Locale, product: ProductType | None
+) -> _Hit | None:
+    """``8R``, ``16T``, ``42R``, ``10 Full Length`` — one size plus a length word."""
+    match = re.fullmatch(
+        rf"({_NUM})\s*(R|T|X|S|L|full\s+length|petite|tall|extra\s+tall)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match is None or _RANGE_TAIL.search(text):
+        return None
+    number = _number(match.group(1))
+    word = match.group(2).casefold()
+    proportion = {
+        "r": "regular",
+        "s": "short",
+        "l": "long",
+        "t": "tall",
+        "x": "extra-tall",
+        "petite": "petite",
+        "tall": "tall",
+        "extra tall": "extra-tall",
+    }.get(word)
+    if (
+        word in {"r", "s", "l"}
+        and _in_span(number, 24, 50)
+        and product not in _DRESS_LIKE
+        and product not in _TOPS
+    ):
+        return None
+    if product in {ProductType.OUTERWEAR, ProductType.SUITS} and _in_span(
+        number, 34, 60
+    ):
+        chart = _regional_chart_unit(region, number, product)
+        label = Size(proportion or "regular", PROPORTION_SIZE)
+        return _Hit("numbered-fit", (Size(number, chart), label), 0.9)
+    if word == "full length":
+        return _Hit(
+            "numbered-fit",
+            (
+                Size(
+                    number,
+                    _locale_dress(region if region is not Locale.FR else Locale.EU),
+                ),
+                Size("long", TOP_LENGTH_SIZE),
+            ),
+            0.88,
+        )
+    if proportion is None:
+        return None
+    dress = Size(
+        number, _locale_dress(region if region is not Locale.FR else Locale.EU)
+    )
+    return _Hit("numbered-fit", (dress, Size(proportion, PROPORTION_SIZE)), 0.88)
+
+
+def _parse_collar_sleeve(
+    text: str, region: Locale, product: ProductType | None
+) -> _Hit | None:
+    """``15.5/34`` on a dress shirt is collar inches and sleeve inches."""
+    if product not in {ProductType.DRESS_SHIRTS, ProductType.SHIRTS}:
+        return None
+    match = re.fullmatch(rf"({_NUM})\s*[/x]\s*(\d{{2}})", text, flags=re.IGNORECASE)
+    if match is None:
+        return None
+    collar = _number(match.group(1))
+    sleeve = _number(match.group(2))
+    if not _in_span(collar, 14, 22) or not _in_span(sleeve, 28, 40):
+        return None
+    return _Hit(
+        "collar-sleeve",
+        (Size(collar, INCH_COLLAR_SIZE), Size(sleeve, INCH_SLEEVE_SIZE)),
+        0.92,
+    )
 
 
 def _parse_region_number(
@@ -750,6 +943,9 @@ def _parse_age(text: str, region: Locale, product: ProductType | None) -> _Hit |
 
 
 _PARSERS = (
+    _parse_regions,
+    _parse_numbered_fit,
+    _parse_collar_sleeve,
     _parse_from_units,
     _parse_age,
     _parse_waist_leg,

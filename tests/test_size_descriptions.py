@@ -87,7 +87,9 @@ def test_bra_age_proportion_and_shoe_width():
     ],
 )
 def test_letter_sizes(raw, token):
-    decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.CASUAL_TOPS)
+    decoded = decode_size_description(
+        raw, Locale.UK, product_type=ProductType.CASUAL_TOPS
+    )
     assert decoded.sizes[0].size_unit.slug == "letter"
     assert decoded.sizes[0].raw == token
     assert Size(raw, LETTER_SIZE).raw == token
@@ -98,6 +100,58 @@ def test_letter_size_loses_to_a_bra_cup():
     top = decode_size_description("M", Locale.UK, product_type=ProductType.CASUAL_TOPS)
     assert bra.sizes[0].size_type.slug == "cup-size"
     assert top.sizes[0].size_type.slug == "letter"
+
+
+def test_multi_region_cell_keeps_each_region_and_prefers_uk():
+    decoded = decode_size_description(
+        "EU 38 / UK 10", Locale.EU, product_type=ProductType.DRESSES
+    )
+    assert [(size.size_unit.slug, str(size.raw)) for size in decoded.sizes] == [
+        ("eu-dress-size", "38"),
+        ("uk-dress-size", "10"),
+    ]
+    encoded = encode_size_description(
+        decoded.sizes, Locale.EU, preferred_regions=(Locale.UK, Locale.EU)
+    )
+    assert encoded.text == "UK 10"
+    assert any(item.reason == "duplicate" for item in encoded.discarded)
+
+    shoe = decode_size_description(
+        "41 (UK 7.5)", Locale.EU, product_type=ProductType.SHOES
+    )
+    assert [size.size_unit.slug for size in shoe.sizes] == [
+        "eu-adult-shoe-size",
+        "uk-adult-shoe-size",
+    ]
+    assert [str(size.raw) for size in shoe.sizes] == ["41", "7.5"]
+
+
+def test_ranges_are_not_sizes():
+    ranged = decode_size_description(
+        "UK 8-10", Locale.UK, product_type=ProductType.DRESSES
+    )
+    assert ranged.sizes == ()
+    assert ranged.discarded[0].reason == "range"
+
+    mixed = decode_size_description(
+        "UK 8-10 / EU 38", Locale.UK, product_type=ProductType.DRESSES
+    )
+    assert [size.size_unit.slug for size in mixed.sizes] == ["eu-dress-size"]
+    assert any(item.reason == "range" for item in mixed.discarded)
+
+
+def test_dress_fit_code_and_shirt_collar_sleeve():
+    dress = decode_size_description("16T", Locale.UK, product_type=ProductType.DRESSES)
+    assert [size.raw for size in dress.sizes] == [16, "tall"]
+
+    shirt = decode_size_description(
+        "15.5/34", Locale.UK, product_type=ProductType.DRESS_SHIRTS
+    )
+    assert [size.size_unit.slug for size in shirt.sizes] == [
+        "in-collar-size",
+        "in-sleeve-length",
+    ]
+    assert [str(size.raw) for size in shirt.sizes] == ["15.5", "34"]
 
 
 def test_product_type_changes_a_bare_number():

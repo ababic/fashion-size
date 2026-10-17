@@ -616,6 +616,16 @@ COLLAR = SizeType(
     length_min_inches=Decimal("11"),
     length_max_inches=Decimal("28"),
 )
+# Dress-shirt sleeve: centre-back neck to wrist, the second number in ``15.5/34``.
+# Retail sleeves run about 30–38 in; the bounds leave room either side.
+SLEEVE = SizeType(
+    SizeTypeSlug.SLEEVE,
+    SizeFamily.LENGTH,
+    "Sleeve",
+    ("sleeve-length",),
+    length_min_inches=Decimal("28"),
+    length_max_inches=Decimal("40"),
+)
 # Sold-as words. ``raw`` is a canonical token (``regular``, ``extra-short``).
 # They do not sit on locale charts. Regional wording lives in ``descriptions``.
 TROUSER_LENGTH = SizeType(
@@ -676,6 +686,7 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     SHORTS_INSEAM,
     TROUSERS_INSEAM,
     COLLAR,
+    SLEEVE,
     TROUSER_LENGTH,
     TOP_LENGTH,
     SHOE_WIDTH,
@@ -1086,6 +1097,12 @@ INCH_COLLAR_SIZE = _length_size_unit(
 CM_COLLAR_SIZE = _length_size_unit(
     COLLAR, unit="cm", display_suffix="cm", label_unit="centimetres"
 )
+INCH_SLEEVE_SIZE = _length_size_unit(
+    SLEEVE, unit="in", display_suffix='"', label_unit="inches"
+)
+CM_SLEEVE_SIZE = _length_size_unit(
+    SLEEVE, unit="cm", display_suffix="cm", label_unit="centimetres"
+)
 
 
 def _label_size_unit(size_type: SizeType) -> SizeUnit:
@@ -1292,9 +1309,7 @@ def _normalize_age_token(text: str, size_type: SizeType) -> str:
     """``5-6 years`` / ``12Y`` / ``0-3 mths`` → ``5-6`` / ``12`` / ``0-3`` on the matching type."""
     compact = text.strip().lower().replace("–", "-")
     months = size_type.slug == AGE_MONTHS.slug
-    unit_pattern = (
-        r"(?:months?|mths?|mth|m)" if months else r"(?:years?|yrs?|yr|y)"
-    )
+    unit_pattern = r"(?:months?|mths?|mth|m)" if months else r"(?:years?|yrs?|yr|y)"
     band = re.fullmatch(rf"(\d{{1,2}})\s*-\s*(\d{{1,2}})\s*{unit_pattern}", compact)
     if band:
         return _age_span(band.group(1), band.group(2))
@@ -1369,6 +1384,8 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     CM_TROUSERS_INSEAM,
     INCH_COLLAR_SIZE,
     CM_COLLAR_SIZE,
+    INCH_SLEEVE_SIZE,
+    CM_SLEEVE_SIZE,
     TROUSER_LENGTH_SIZE,
     TOP_LENGTH_SIZE,
     SHOE_WIDTH_SIZE,
