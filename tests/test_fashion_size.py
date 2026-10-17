@@ -347,23 +347,23 @@ def test_length_conversion_and_display():
 def test_garment_inseam_length_bounds():
     demographic = Demographic("adult", "unisex")
     assert (
-        Size.from_raw(3, INCH_SHORTS_INSEAM)
+        Size.from_raw(2, INCH_SHORTS_INSEAM)
         .convert("cm", demographic=demographic)
         .raw
-        == Decimal("7.62")
+        == Decimal("5.08")
     )
     assert (
-        Size.from_raw(26, INCH_SHORTS_INSEAM)
+        Size.from_raw(18, INCH_SHORTS_INSEAM)
         .convert("cm", demographic=demographic)
         .raw
-        == Decimal("66.04")
+        == Decimal("45.72")
     )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("2.9"), INCH_SHORTS_INSEAM).convert(
+        Size.from_raw(Decimal("1.9"), INCH_SHORTS_INSEAM).convert(
             "cm", demographic=demographic
         )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("26.1"), INCH_SHORTS_INSEAM).convert(
+        Size.from_raw(Decimal("20.1"), INCH_SHORTS_INSEAM).convert(
             "cm", demographic=demographic
         )
 
@@ -373,12 +373,24 @@ def test_garment_inseam_length_bounds():
         .raw
         == Decimal("81.28")
     )
+    assert (
+        Size.from_raw(24, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("60.96")
+    )
+    assert (
+        Size.from_raw(40, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("101.6")
+    )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(25, INCH_TROUSERS_INSEAM).convert(
+        Size.from_raw(21, INCH_TROUSERS_INSEAM).convert(
             "cm", demographic=demographic
         )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("40.1"), INCH_TROUSERS_INSEAM).convert(
+        Size.from_raw(Decimal("42.1"), INCH_TROUSERS_INSEAM).convert(
             "cm", demographic=demographic
         )
 
@@ -389,8 +401,8 @@ def test_garment_inseam_length_bounds():
     assert size_from_attribute_option("in-shorts-inseam", '30"') is None
 
     bounds = clothing_length_entry_bounds(SHORTS_INSEAM)
-    assert bounds.min_inches == Decimal("3") and bounds.max_inches == Decimal("26")
-    assert bounds.min_centimetres == Decimal("7.62")
+    assert bounds.min_inches == Decimal("2") and bounds.max_inches == Decimal("20")
+    assert bounds.min_centimetres == Decimal("5.08")
     assert clothing_length_value_in_range(5, INCH_SHORTS_INSEAM)
     assert not clothing_length_value_in_range(30, INCH_SHORTS_INSEAM)
 
@@ -403,9 +415,11 @@ def test_garment_inseam_length_bounds():
         TROUSERS_INSEAM,
         INSIDE_LEG,
     )
-    at_twenty_six = clothing_length_size_types_for_inches(26)
-    assert at_twenty_six[:2] == (TROUSERS_INSEAM, SHORTS_INSEAM)
-    assert INSIDE_LEG in at_twenty_six
+    assert clothing_length_size_types_for_inches(26) == (
+        TROUSERS_INSEAM,
+        INSIDE_LEG,
+    )
+    assert clothing_length_size_types_for_inches(21) == (INSIDE_LEG,)
     assert clothing_length_size_types_for_measurement(
         81, unit="cm", candidates=GARMENT_INSEAM_SIZE_TYPES
     ) == (TROUSERS_INSEAM,)

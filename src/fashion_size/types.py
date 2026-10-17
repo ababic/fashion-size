@@ -526,21 +526,25 @@ INSIDE_LEG = SizeType(
     "Inside leg",
     ("inside-leg", "leg-length"),
 )
+# Inseam bounds follow common retail spans (athletic/bermuda shorts through big &
+# tall long cargo ~18 in) with headroom for catalog noise. Trousers start above
+# the longest shorts so values cannot sit in both fields; petite pants from ~24
+# in, big/tall stock to 38–40 in (KingSize, American Tall), capped at 42 in.
 SHORTS_INSEAM = SizeType(
     SizeTypeSlug.SHORTS_INSEAM,
     SizeFamily.LENGTH,
     "Shorts inseam",
     ("shorts-inseam",),
-    length_min_inches=Decimal("3"),
-    length_max_inches=Decimal("26"),
+    length_min_inches=Decimal("2"),
+    length_max_inches=Decimal("20"),
 )
 TROUSERS_INSEAM = SizeType(
     SizeTypeSlug.TROUSERS_INSEAM,
     SizeFamily.LENGTH,
     "Trousers inseam",
     ("trousers-inseam",),
-    length_min_inches=Decimal("26"),
-    length_max_inches=Decimal("40"),
+    length_min_inches=Decimal("22"),
+    length_max_inches=Decimal("42"),
 )
 COLLAR = SizeType(SizeTypeSlug.COLLAR, SizeFamily.LENGTH, "Collar", ("collar-size",))
 
