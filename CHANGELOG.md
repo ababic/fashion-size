@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2026.10.17
+
 - `shorts-inseam` and `trousers-inseam` length size types with non-overlapping inch bounds 2–22 and 24–42 (retail-aligned, with headroom for long shorts and big-and-tall trousers). Formula conversion rejects values outside each type's range. Generic `inside-leg` keeps the 5–150 inch clothing range.
 - `LengthRange` on each length `SizeType` via `length_range`, plus `length_range_start` and `length_range_stop` (and the same on `SizeUnit`), so hosts can read inclusive bounds without locale charts.
 - `length_entry_bounds`, `length_value_in_range`, and `length_size_types_for_inches` / `length_size_types_for_measurement` for form min/max and inferring which length attribute a raw value might represent. `size_from_attribute_option` rejects out-of-range length values.
