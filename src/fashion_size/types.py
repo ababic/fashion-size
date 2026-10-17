@@ -654,6 +654,12 @@ AGE_YEARS = SizeType(
     "Age (years)",
     ("age-years",),
 )
+LETTER = SizeType(
+    SizeTypeSlug.LETTER,
+    SizeFamily.LABEL,
+    "Letter size",
+    ("letter-size", "generic-size"),
+)
 
 SIZE_TYPES: tuple[SizeType, ...] = (
     DRESS,
@@ -676,6 +682,7 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     PROPORTION,
     AGE_MONTHS,
     AGE_YEARS,
+    LETTER,
 )
 SIZE_TYPE_BY_SLUG: dict[str, SizeType] = {
     size_type.slug: size_type for size_type in SIZE_TYPES
@@ -923,6 +930,14 @@ def _label_recognition(size_type: SizeType) -> tuple[str, ...]:
     patterns = [rf"(?<![A-Za-z])(?P<value>{words})(?![A-Za-z])"]
     if size_type.slug == "trouser-length":
         patterns.append(r"(?<=\d)\s*(?P<value>[SRL])(?![A-Za-z])")
+    if size_type.slug == "letter":
+        token = (
+            r"(?:one\s*size|os|xxx{0,4}s|xxx{0,3}l|[2-6]\s*x\s*l|"
+            r"extra\s*small|x{1,2}\s*-?\s*small|small|medium|large|"
+            r"extra\s*large|x{1,6}\s*-?\s*large|[2-6]\s*x\s*-?\s*large|"
+            r"xxs|xs|xl|xxl|[2-6]xl|s|m|l)"
+        )
+        return (rf"(?<![A-Za-z0-9])(?P<value>{token})(?![A-Za-z0-9])",)
     return tuple(patterns)
 
 
@@ -1089,6 +1104,7 @@ SHOE_WIDTH_SIZE = _label_size_unit(SHOE_WIDTH)
 PROPORTION_SIZE = _label_size_unit(PROPORTION)
 AGE_MONTHS_SIZE = _label_size_unit(AGE_MONTHS)
 AGE_YEARS_SIZE = _label_size_unit(AGE_YEARS)
+LETTER_SIZE = _label_size_unit(LETTER)
 
 # Canonical token → English display. Aliases fold into the canonical token.
 _LABEL_CANONICAL: dict[str, dict[str, str]] = {
@@ -1118,6 +1134,20 @@ _LABEL_CANONICAL: dict[str, dict[str, str]] = {
         "regular": "Regular",
         "petite": "Petite",
         "short": "Short",
+    },
+    LETTER.slug: {
+        "XXS": "XXS",
+        "XS": "XS",
+        "S": "S",
+        "M": "M",
+        "L": "L",
+        "XL": "XL",
+        "2XL": "2XL",
+        "3XL": "3XL",
+        "4XL": "4XL",
+        "5XL": "5XL",
+        "6XL": "6XL",
+        "ONE": "One size",
     },
 }
 _LABEL_ALIASES: dict[str, dict[str, str]] = {
@@ -1185,6 +1215,45 @@ _LABEL_ALIASES: dict[str, dict[str, str]] = {
         "pet": "petite",
         "pt": "petite",
         "short": "short",
+    },
+    LETTER.slug: {
+        "xxs": "XXS",
+        "2xs": "XXS",
+        "xxsmall": "XXS",
+        "extra small": "XS",
+        "extrasmall": "XS",
+        "xsmall": "XS",
+        "x-small": "XS",
+        "x small": "XS",
+        "xs": "XS",
+        "small": "S",
+        "s": "S",
+        "medium": "M",
+        "med": "M",
+        "m": "M",
+        "large": "L",
+        "l": "L",
+        "extra large": "XL",
+        "extralarge": "XL",
+        "x-large": "XL",
+        "x large": "XL",
+        "xlarge": "XL",
+        "xl": "XL",
+        "xxl": "2XL",
+        "xxlarge": "2XL",
+        "2xl": "2XL",
+        "2x large": "2XL",
+        "xxxl": "3XL",
+        "3xl": "3XL",
+        "xxxxl": "4XL",
+        "4xl": "4XL",
+        "xxxxxl": "5XL",
+        "5xl": "5XL",
+        "xxxxxxl": "6XL",
+        "6xl": "6XL",
+        "one size": "ONE",
+        "onesize": "ONE",
+        "os": "ONE",
     },
 }
 
@@ -1306,6 +1375,7 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     PROPORTION_SIZE,
     AGE_MONTHS_SIZE,
     AGE_YEARS_SIZE,
+    LETTER_SIZE,
 )
 SIZE_UNIT_BY_SLUG: dict[str, SizeUnit] = {
     size_unit.slug: size_unit for size_unit in SIZE_UNITS

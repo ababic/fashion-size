@@ -15,6 +15,7 @@ from fashion_size.types import (
     INCH_SHORTS_INSEAM,
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
+    LETTER_SIZE,
     PROPORTION_SIZE,
     SHOE_WIDTH_SIZE,
     TOP_LENGTH_SIZE,
@@ -65,6 +66,38 @@ def test_bra_age_proportion_and_shoe_width():
     width = decode_size_description("UK 6 G", Locale.UK, product_type=ProductType.SHOES)
     assert width.sizes[0].size_unit.locale.value == "uk"
     assert width.sizes[1].raw == "wide"
+
+
+@pytest.mark.parametrize(
+    ("raw", "token"),
+    [
+        ("S", "S"),
+        ("small", "S"),
+        ("M", "M"),
+        ("medium", "M"),
+        ("L", "L"),
+        ("XL", "XL"),
+        ("XXL", "2XL"),
+        ("2XL", "2XL"),
+        ("3XL", "3XL"),
+        ("XS", "XS"),
+        ("XXS", "XXS"),
+        ("one size", "ONE"),
+        ("OS", "ONE"),
+    ],
+)
+def test_letter_sizes(raw, token):
+    decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.CASUAL_TOPS)
+    assert decoded.sizes[0].size_unit.slug == "letter"
+    assert decoded.sizes[0].raw == token
+    assert Size(raw, LETTER_SIZE).raw == token
+
+
+def test_letter_size_loses_to_a_bra_cup():
+    bra = decode_size_description("M", Locale.UK, product_type=ProductType.BRAS)
+    top = decode_size_description("M", Locale.UK, product_type=ProductType.CASUAL_TOPS)
+    assert bra.sizes[0].size_type.slug == "cup-size"
+    assert top.sizes[0].size_type.slug == "letter"
 
 
 def test_product_type_changes_a_bare_number():
@@ -285,7 +318,7 @@ def test_suffixed_lengths(raw, product, slug, value):
 
 @pytest.mark.parametrize(
     "raw",
-    ["", "   ", "not-a-size", "one size", "XXL", "S", "short sleeve", "Pace Breaker"],
+    ["", "   ", "not-a-size", "short sleeve", "Pace Breaker"],
 )
 def test_unrecognised_cells(raw):
     decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.DRESSES)

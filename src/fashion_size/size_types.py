@@ -30,3 +30,4 @@ class SizeTypeSlug(StrEnum):
     PROPORTION = "proportion"
     AGE_MONTHS = "age-months"
     AGE_YEARS = "age-years"
+    LETTER = "letter"

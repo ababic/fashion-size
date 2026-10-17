@@ -408,6 +408,14 @@ def _size_from_unit_match(
         score += 0.2 if product in affinity else -0.25
     if unit.locale is chart_region or unit.locale is region:
         score += 0.05
+    if (
+        unit.size_type.family is SizeFamily.CUP_SIZE
+        and size.raw in {"S", "M", "L"}
+        and product is not ProductType.BRAS
+    ):
+        score -= 0.45
+    if unit.size_type.slug == "letter" and product is ProductType.BRAS:
+        score -= 0.45
     return size, score
 
 
@@ -430,6 +438,7 @@ _PRODUCT_AFFINITY: dict[str, frozenset[ProductType]] = {
     "top-length": _TOPS,
     "shoe-width": _FOOTWEAR,
     "proportion": _DRESS_LIKE | _TOPS,
+    "letter": _DRESS_LIKE | _TOPS | _BOTTOMS | frozenset({ProductType.UNDERWEAR, ProductType.HOSIERY}),
 }
 
 
@@ -956,9 +965,7 @@ def _encode_shoe(sizes: tuple[Size, ...], region: Locale, source: Locale):
 
 def _encode_age(sizes: tuple[Size, ...], region: Locale, source: Locale):
     age = next(
-        size
-        for size in sizes
-        if size.size_type.slug in {"age-months", "age-years"}
+        size for size in sizes if size.size_type.slug in {"age-months", "age-years"}
     )
     return age.display(), (age,), ()
 

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Label size types `trouser-length`, `top-length`, `shoe-width`, `proportion`, `age-months`, and `age-years`. Tokens are canonical (`regular`, `extra-wide`, `5-6`, `0-3`). Month bands accept `months`, `month`, `mths`, `mth`, and `m`. They do not use conversion charts.
+- Label size types `trouser-length`, `top-length`, `shoe-width`, `proportion`, `age-months`, `age-years`, and `letter`. Tokens are canonical (`regular`, `extra-wide`, `5-6`, `2XL`, `ONE`). Month bands accept `months`, `month`, `mths`, `mth`, and `m`. Letter sizes accept `S`/`small`, `XXL`/`2XL`, and `one size`. They do not use conversion charts.
 - `fashion_size.descriptions.decode_size_description` and `encode_size_description` recognise feed size strings and join size values back into one string. The module is not imported with the package. `source_region`, `preferred_regions`, and `product_type` take `Locale` and `ProductType` values. Chart sizes stay in the region they were found in. Length values can move between inches and centimetres for a preferred region. Results include a confidence score and discarded tokens.
 
 ## 2026.10.17
