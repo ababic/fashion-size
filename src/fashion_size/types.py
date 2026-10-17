@@ -94,7 +94,7 @@ class MissingScaleError(ValueError):
 
 
 class LengthOutOfRangeError(ValueError):
-    """Length is outside the clothing / accessories / curtain range (5–150 inches)."""
+    """Length is outside the inclusive inch range for its size type."""
 
 
 def _finite_decimal(value: int | float | str | Decimal) -> Decimal:
@@ -415,6 +415,29 @@ def format_age_gender(age_group: str, gender: str) -> str:
     return f"{age_group_label(age_group)} / {gender_label(gender)}"
 
 
+# Fallback when a length size type omits ``length_min_inches`` / ``length_max_inches``.
+DEFAULT_LENGTH_MIN_INCHES = Decimal("5")
+DEFAULT_LENGTH_MAX_INCHES = Decimal("150")
+# Matches ``fashion_size.conversion.CM_PER_INCH`` (kept here to avoid import cycles).
+LENGTH_CM_PER_INCH = Decimal("2.54")
+
+
+@dataclass(frozen=True, slots=True)
+class LengthRange:
+    """Inclusive formula-length bounds for one size type (not from locale charts)."""
+
+    start_inches: Decimal
+    stop_inches: Decimal
+
+    @property
+    def start_centimetres(self) -> Decimal:
+        return self.start_inches * LENGTH_CM_PER_INCH
+
+    @property
+    def stop_centimetres(self) -> Decimal:
+        return self.stop_inches * LENGTH_CM_PER_INCH
+
+
 @dataclass(frozen=True, slots=True)
 class SizeType:
     """Fine-grained size category (dress, adult shoe, chest, …).
@@ -429,10 +452,50 @@ class SizeType:
     # SizeUnit slug stem when it must not also be an attribute-slug alias.
     # ``uk-waist-size`` is the regional label; ``waist-size`` stays the length size type.
     slug_stem: str = ""
+    # Inclusive inch bounds for ``SizeFamily.LENGTH`` types. Hosts use these for
+    # min/max on size entry fields and to infer which length attribute a number
+    # might belong to. ``None`` uses ``DEFAULT_LENGTH_MIN_INCHES`` /
+    # ``DEFAULT_LENGTH_MAX_INCHES`` (chest, waist, collar, inside leg).
+    length_min_inches: Decimal | None = None
+    length_max_inches: Decimal | None = None
 
     @property
     def supports_brand_overrides(self) -> bool:
         return self.family.supports_brand_overrides
+
+    @property
+    def length_range(self) -> LengthRange | None:
+        """Resolved inch range for formula length types, or ``None`` for chart types."""
+        if self.family != SizeFamily.LENGTH:
+            return None
+        start, stop = self.length_inch_bounds()
+        return LengthRange(start_inches=start, stop_inches=stop)
+
+    @property
+    def length_range_start(self) -> Decimal | None:
+        """Inclusive range start in inches, or ``None`` when bounds do not apply."""
+        resolved = self.length_range
+        return None if resolved is None else resolved.start_inches
+
+    @property
+    def length_range_stop(self) -> Decimal | None:
+        """Inclusive range stop in inches, or ``None`` when bounds do not apply."""
+        resolved = self.length_range
+        return None if resolved is None else resolved.stop_inches
+
+    def length_inch_bounds(self) -> tuple[Decimal, Decimal]:
+        if self.family != SizeFamily.LENGTH:
+            raise ValueError(
+                f"{self.label} is not a length size type — inch bounds do not apply."
+            )
+        return (
+            self.length_min_inches
+            if self.length_min_inches is not None
+            else DEFAULT_LENGTH_MIN_INCHES,
+            self.length_max_inches
+            if self.length_max_inches is not None
+            else DEFAULT_LENGTH_MAX_INCHES,
+        )
 
     def __str__(self) -> str:
         return self.label
@@ -494,15 +557,61 @@ CHEST_SIZE = SizeType(
     "Chest size",
     slug_stem="chest-size",
 )
-CHEST = SizeType(SizeTypeSlug.CHEST, SizeFamily.LENGTH, "Chest", ("chest-size",))
-WAIST = SizeType(SizeTypeSlug.WAIST, SizeFamily.LENGTH, "Waist", ("waist-size",))
+# Body measurements (in/cm formula types). Bounds follow default chart spans,
+# children's school-uniform rows, and big-and-tall retail with headroom.
+CHEST = SizeType(
+    SizeTypeSlug.CHEST,
+    SizeFamily.LENGTH,
+    "Chest",
+    ("chest-size",),
+    length_min_inches=Decimal("18"),
+    length_max_inches=Decimal("88"),
+)
+WAIST = SizeType(
+    SizeTypeSlug.WAIST,
+    SizeFamily.LENGTH,
+    "Waist",
+    ("waist-size",),
+    length_min_inches=Decimal("16"),
+    length_max_inches=Decimal("85"),
+)
+# Generic inseam / inside-leg when the catalog does not split shorts vs trousers.
 INSIDE_LEG = SizeType(
     SizeTypeSlug.INSIDE_LEG,
     SizeFamily.LENGTH,
     "Inside leg",
     ("inside-leg", "leg-length"),
+    length_min_inches=Decimal("2"),
+    length_max_inches=Decimal("42"),
 )
-COLLAR = SizeType(SizeTypeSlug.COLLAR, SizeFamily.LENGTH, "Collar", ("collar-size",))
+# Inseam bounds follow common retail spans (athletic/bermuda shorts through big &
+# tall long cargo ~18 in) with headroom to 22 in for long-short SKUs. Trousers
+# start at 24 in (petite/ankle pants and up) so values cannot sit in both fields;
+# big/tall stock to 38–40 in (KingSize, American Tall), capped at 42 in.
+SHORTS_INSEAM = SizeType(
+    SizeTypeSlug.SHORTS_INSEAM,
+    SizeFamily.LENGTH,
+    "Shorts inseam",
+    ("shorts-inseam",),
+    length_min_inches=Decimal("2"),
+    length_max_inches=Decimal("22"),
+)
+TROUSERS_INSEAM = SizeType(
+    SizeTypeSlug.TROUSERS_INSEAM,
+    SizeFamily.LENGTH,
+    "Trousers inseam",
+    ("trousers-inseam",),
+    length_min_inches=Decimal("24"),
+    length_max_inches=Decimal("42"),
+)
+COLLAR = SizeType(
+    SizeTypeSlug.COLLAR,
+    SizeFamily.LENGTH,
+    "Collar",
+    ("collar-size",),
+    length_min_inches=Decimal("11"),
+    length_max_inches=Decimal("28"),
+)
 
 SIZE_TYPES: tuple[SizeType, ...] = (
     DRESS,
@@ -516,6 +625,8 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     CHEST,
     WAIST,
     INSIDE_LEG,
+    SHORTS_INSEAM,
+    TROUSERS_INSEAM,
     COLLAR,
 )
 SIZE_TYPE_BY_SLUG: dict[str, SizeType] = {
@@ -527,6 +638,123 @@ BRAND_CHART_SIZE_TYPE_SLUGS: frozenset[str] = frozenset(
 ATTRIBUTE_SIZE_TYPES: dict[str, SizeType] = {
     slug: size_type for size_type in SIZE_TYPES for slug in size_type.attribute_slugs
 }
+
+GARMENT_INSEAM_SIZE_TYPES: tuple[SizeType, ...] = (SHORTS_INSEAM, TROUSERS_INSEAM)
+LEG_LENGTH_SIZE_TYPES: tuple[SizeType, ...] = (
+    SHORTS_INSEAM,
+    TROUSERS_INSEAM,
+    INSIDE_LEG,
+)
+LENGTH_SIZE_TYPES: tuple[SizeType, ...] = tuple(
+    size_type for size_type in SIZE_TYPES if size_type.family == SizeFamily.LENGTH
+)
+
+
+@dataclass(frozen=True, slots=True)
+class LengthEntryBounds:
+    """Inclusive min/max for one length size type (forms, sliders, validation)."""
+
+    min_inches: Decimal
+    max_inches: Decimal
+    min_centimetres: Decimal
+    max_centimetres: Decimal
+
+
+def length_entry_bounds(size_type: SizeType) -> LengthEntryBounds:
+    """Return inch and centimetre limits for a length size type's entry controls."""
+    resolved = size_type.length_range
+    if resolved is None:
+        raise ValueError(
+            f"{size_type.label} is not a length size type — entry bounds do not apply."
+        )
+    return LengthEntryBounds(
+        min_inches=resolved.start_inches,
+        max_inches=resolved.stop_inches,
+        min_centimetres=resolved.start_centimetres,
+        max_centimetres=resolved.stop_centimetres,
+    )
+
+
+def length_in_inch_range(
+    size_type: SizeType, inches: int | float | str | Decimal
+) -> bool:
+    """Whether ``inches`` fits the size type's inclusive length bounds."""
+    if size_type.family != SizeFamily.LENGTH:
+        raise ValueError(
+            f"{size_type.label} is not a length size type — inch bounds do not apply."
+        )
+    value = normalize_length_raw(inches)
+    min_inches, max_inches = size_type.length_inch_bounds()
+    return min_inches <= value <= max_inches
+
+
+def _inches_from_length_measurement(
+    raw: int | float | str | Decimal, *, unit: str
+) -> Decimal:
+    value = normalize_length_raw(raw)
+    normalized = (unit or "").strip().lower()
+    if normalized == "in":
+        return value
+    if normalized == "cm":
+        from fashion_size.conversion import CM_PER_INCH
+
+        return value / CM_PER_INCH
+    raise ValueError(f"Unknown length unit {unit!r}.")
+
+
+def length_value_in_range(
+    raw: int | float | str | Decimal, size_unit: SizeUnit
+) -> bool:
+    """Whether a typed length value fits the size unit's inch bounds."""
+    if size_unit.size_type.family != SizeFamily.LENGTH:
+        raise ValueError(
+            f"{size_unit.size_type.label} is not a length size type — bounds do not apply."
+        )
+    if not size_unit.length_unit:
+        raise ValueError(f"{size_unit.label} is not a centimetre or inch size unit.")
+    inches = _inches_from_length_measurement(
+        raw, unit=size_unit.length_unit
+    )
+    return length_in_inch_range(size_unit.size_type, inches)
+
+
+def length_size_types_for_inches(
+    inches: int | float | str | Decimal,
+    *,
+    candidates: tuple[SizeType, ...] | None = None,
+) -> tuple[SizeType, ...]:
+    """Length size types whose bounds contain ``inches``, narrowest span first.
+
+    When a raw number could belong to several length attributes (shorts inseam,
+    trousers inseam, inside leg, …), tighter bounds rank ahead of wider ones so
+    garment-specific inseams beat generic inside leg.
+    """
+    value = normalize_length_raw(inches)
+    pool = LEG_LENGTH_SIZE_TYPES if candidates is None else candidates
+
+    def span(size_type: SizeType) -> Decimal:
+        lo, hi = size_type.length_inch_bounds()
+        return hi - lo
+
+    matches = [
+        size_type
+        for size_type in pool
+        if size_type.family == SizeFamily.LENGTH
+        and length_in_inch_range(size_type, value)
+    ]
+    matches.sort(key=span)
+    return tuple(matches)
+
+
+def length_size_types_for_measurement(
+    raw: int | float | str | Decimal,
+    *,
+    unit: Literal["in", "cm"],
+    candidates: tuple[SizeType, ...] | None = None,
+) -> tuple[SizeType, ...]:
+    """Like ``length_size_types_for_inches`` for a cm or inch measurement."""
+    inches = _inches_from_length_measurement(raw, unit=unit)
+    return length_size_types_for_inches(inches, candidates=candidates)
 
 
 @dataclass(frozen=True, slots=True)
@@ -548,6 +776,11 @@ class SizeUnit:
     @property
     def supports_brand_overrides(self) -> bool:
         return self.size_type.supports_brand_overrides
+
+    @property
+    def length_range(self) -> LengthRange | None:
+        """Resolved inch range for this unit's size type, if it is a formula length."""
+        return self.size_type.length_range
 
     def can_convert_to(self, other: SizeUnit) -> bool:
         return self.size_type.slug == other.size_type.slug
@@ -677,6 +910,18 @@ INCH_INSIDE_LEG = _length_size_unit(
 CM_INSIDE_LEG = _length_size_unit(
     INSIDE_LEG, unit="cm", display_suffix="cm", label_unit="centimetres"
 )
+INCH_SHORTS_INSEAM = _length_size_unit(
+    SHORTS_INSEAM, unit="in", display_suffix='"', label_unit="inches"
+)
+CM_SHORTS_INSEAM = _length_size_unit(
+    SHORTS_INSEAM, unit="cm", display_suffix="cm", label_unit="centimetres"
+)
+INCH_TROUSERS_INSEAM = _length_size_unit(
+    TROUSERS_INSEAM, unit="in", display_suffix='"', label_unit="inches"
+)
+CM_TROUSERS_INSEAM = _length_size_unit(
+    TROUSERS_INSEAM, unit="cm", display_suffix="cm", label_unit="centimetres"
+)
 INCH_COLLAR_SIZE = _length_size_unit(
     COLLAR, unit="in", display_suffix='"', label_unit="inches"
 )
@@ -724,6 +969,10 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     CM_WAIST_SIZE,
     INCH_INSIDE_LEG,
     CM_INSIDE_LEG,
+    INCH_SHORTS_INSEAM,
+    CM_SHORTS_INSEAM,
+    INCH_TROUSERS_INSEAM,
+    CM_TROUSERS_INSEAM,
     INCH_COLLAR_SIZE,
     CM_COLLAR_SIZE,
 )
@@ -910,7 +1159,10 @@ def size_from_attribute_option(
             if token is not None:
                 return Size(raw=token, size_unit=size_unit)
         if size_unit.size_type.family == SizeFamily.LENGTH:
-            return Size(raw=normalize_length_raw(text), size_unit=size_unit)
+            raw = normalize_length_raw(text)
+            if not length_value_in_range(raw, size_unit):
+                return None
+            return Size(raw=raw, size_unit=size_unit)
         return Size(raw=normalize_raw(text), size_unit=size_unit)
     except (InvalidOperation, ValueError, TypeError):
         return None

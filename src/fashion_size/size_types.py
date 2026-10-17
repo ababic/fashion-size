@@ -21,4 +21,6 @@ class SizeTypeSlug(StrEnum):
     CHEST = "chest"
     WAIST = "waist"
     INSIDE_LEG = "inside-leg"
+    SHORTS_INSEAM = "shorts-inseam"
+    TROUSERS_INSEAM = "trousers-inseam"
     COLLAR = "collar"

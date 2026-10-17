@@ -47,7 +47,9 @@ from fashion_size.types import (
     AU_BAND_SIZE,
     AU_CHEST_SIZE,
     AU_WAIST_SIZE,
+    CHEST,
     CM_CHEST_SIZE,
+    COLLAR,
     EU_ADULT_SHOE_SIZE,
     EU_BAND_SIZE,
     EU_CHEST_SIZE,
@@ -55,7 +57,13 @@ from fashion_size.types import (
     EU_DRESS_SIZE,
     EU_WAIST_SIZE,
     FR_BAND_SIZE,
+    GARMENT_INSEAM_SIZE_TYPES,
     INCH_CHEST_SIZE,
+    INCH_SHORTS_INSEAM,
+    INCH_TROUSERS_INSEAM,
+    INSIDE_LEG,
+    SHORTS_INSEAM,
+    TROUSERS_INSEAM,
     UK_ADULT_SHOE_SIZE,
     UK_BABY_SHOE_SIZE,
     UK_BAND_SIZE,
@@ -68,11 +76,16 @@ from fashion_size.types import (
     US_CHEST_SIZE,
     US_CUP_SIZE,
     US_WAIST_SIZE,
+    WAIST,
     IncompatibleSizeError,
     LengthOutOfRangeError,
     MissingScaleError,
     Size,
     UnknownSizeError,
+    length_entry_bounds,
+    length_size_types_for_inches,
+    length_size_types_for_measurement,
+    length_value_in_range,
     parse_size_unit_slug,
     size_from_attribute_option,
     size_unit_choices_for_type,
@@ -80,7 +93,7 @@ from fashion_size.types import (
 
 
 def test_version_is_the_current_release():
-    assert __version__ == "2026.10.10.1"
+    assert __version__ == "2026.10.17"
 
 
 def test_readme_brand_chart_example():
@@ -311,16 +324,16 @@ def test_length_conversion_and_display():
     )
 
     assert (
-        Size.from_raw(5, INCH_CHEST_SIZE)
+        Size.from_raw(18, INCH_CHEST_SIZE)
         .convert("cm", demographic=Demographic("adult", "unisex"))
         .raw
-        == Decimal("12.7")
+        == Decimal("45.72")
     )
     assert (
-        Size.from_raw(150, INCH_CHEST_SIZE)
+        Size.from_raw(88, INCH_CHEST_SIZE)
         .convert("cm", demographic=Demographic("adult", "unisex"))
         .raw
-        == Decimal("381")
+        == Decimal("223.52")
     )
     assert (
         Size.from_raw(Decimal("10.3"), INCH_CHEST_SIZE).localised_display() == '10.5"'
@@ -332,6 +345,109 @@ def test_length_conversion_and_display():
     register_display_language(lambda: "de")
     assert str(inches) == "32 in"
     assert inches.localised_display("en-gb") == '32"'
+
+
+def test_garment_inseam_length_bounds():
+    demographic = Demographic("adult", "unisex")
+    assert (
+        Size.from_raw(2, INCH_SHORTS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("5.08")
+    )
+    assert (
+        Size.from_raw(18, INCH_SHORTS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("45.72")
+    )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("1.9"), INCH_SHORTS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+    assert (
+        Size.from_raw(22, INCH_SHORTS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("55.88")
+    )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("22.1"), INCH_SHORTS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+
+    assert (
+        Size.from_raw(32, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("81.28")
+    )
+    assert (
+        Size.from_raw(24, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("60.96")
+    )
+    assert (
+        Size.from_raw(40, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("101.6")
+    )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(23, INCH_TROUSERS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("42.1"), INCH_TROUSERS_INSEAM).convert(
+            "cm", demographic=demographic
+        )
+
+    shorts = size_from_attribute_option("in-shorts-inseam", '5"')
+    assert shorts is not None and shorts.size_unit is INCH_SHORTS_INSEAM
+    trousers = size_from_attribute_option("cm-trousers-inseam", "81cm")
+    assert trousers is not None and trousers.raw == Decimal("81")
+    assert size_from_attribute_option("in-shorts-inseam", '30"') is None
+
+    assert SHORTS_INSEAM.length_range_start == Decimal("2")
+    assert SHORTS_INSEAM.length_range_stop == Decimal("22")
+    assert SHORTS_INSEAM.length_range is not None
+    assert INCH_SHORTS_INSEAM.length_range == SHORTS_INSEAM.length_range
+    assert INSIDE_LEG.length_range_start == Decimal("2")
+    assert INSIDE_LEG.length_range_stop == Decimal("42")
+    assert CHEST.length_range_start == Decimal("18")
+    assert WAIST.length_range_stop == Decimal("85")
+    assert COLLAR.length_range_stop == Decimal("28")
+    assert UK_DRESS_SIZE.size_type.length_range_start is None
+
+    bounds = length_entry_bounds(SHORTS_INSEAM)
+    assert bounds.min_inches == SHORTS_INSEAM.length_range_start
+    assert bounds.max_inches == SHORTS_INSEAM.length_range_stop
+    assert bounds.min_centimetres == Decimal("5.08")
+    assert length_value_in_range(5, INCH_SHORTS_INSEAM)
+    assert not length_value_in_range(30, INCH_SHORTS_INSEAM)
+
+    assert length_size_types_for_inches(10) == (
+        SHORTS_INSEAM,
+        INSIDE_LEG,
+    )
+    assert len(length_size_types_for_inches(10, candidates=())) == 0
+    assert length_size_types_for_inches(32) == (
+        TROUSERS_INSEAM,
+        INSIDE_LEG,
+    )
+    assert length_size_types_for_inches(26) == (
+        TROUSERS_INSEAM,
+        INSIDE_LEG,
+    )
+    assert length_size_types_for_inches(23) == (INSIDE_LEG,)
+    assert length_size_types_for_inches(22) == (
+        SHORTS_INSEAM,
+        INSIDE_LEG,
+    )
+    assert length_size_types_for_measurement(
+        81, unit="cm", candidates=GARMENT_INSEAM_SIZE_TYPES
+    ) == (TROUSERS_INSEAM,)
 
 
 def test_waist_chest_and_band_measurements_display_like_length():
@@ -394,7 +510,7 @@ def test_conversion_rejects_unknown_or_incompatible_values():
             "cm", demographic=Demographic("adult", "female")
         )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("4.9"), INCH_CHEST_SIZE).convert(
+        Size.from_raw(Decimal("17.9"), INCH_CHEST_SIZE).convert(
             "cm", demographic=Demographic("adult", "unisex")
         )
     with pytest.raises(LengthOutOfRangeError):
@@ -402,7 +518,7 @@ def test_conversion_rejects_unknown_or_incompatible_values():
             "in", demographic=Demographic("adult", "unisex")
         )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("150.1"), INCH_CHEST_SIZE).convert(
+        Size.from_raw(Decimal("88.1"), INCH_CHEST_SIZE).convert(
             "cm", demographic=Demographic("adult", "unisex")
         )
     with pytest.raises(ValueError, match="cup"):
