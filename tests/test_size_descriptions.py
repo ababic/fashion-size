@@ -23,44 +23,45 @@ from fashion_size.types import (
     UK_CUP_SIZE,
     UK_DRESS_SIZE,
     US_DRESS_SIZE,
+    Locale,
     Size,
 )
 
 
 def test_waist_leg_and_length_code():
-    decoded = decode_size_description("30/32", "uk", product_type=ProductType.JEANS)
+    decoded = decode_size_description("30/32", Locale.UK, product_type=ProductType.JEANS)
     assert decoded.format_id == "waist-leg"
     assert decoded.confidence >= 0.9
     assert [size.raw for size in decoded.sizes] == [30, 32]
-    encoded = encode_size_description(decoded.sizes, "uk")
+    encoded = encode_size_description(decoded.sizes, Locale.UK)
     assert encoded.text == "30/32"
 
-    length = decode_size_description("30L", "uk", product_type=ProductType.TROUSERS)
+    length = decode_size_description("30L", Locale.UK, product_type=ProductType.TROUSERS)
     assert length.format_id == "waist-length"
     assert length.sizes[1].raw == "long"
-    assert encode_size_description(length.sizes, "uk").text == "30L"
+    assert encode_size_description(length.sizes, Locale.UK).text == "30L"
 
 
 def test_bra_age_proportion_and_shoe_width():
-    bra = decode_size_description("32DD", "uk", product_type=ProductType.BRAS)
+    bra = decode_size_description("32DD", Locale.UK, product_type=ProductType.BRAS)
     assert bra.format_id == "bra"
     assert bra.sizes[1].raw == "DD"
 
-    age = decode_size_description("5-6 yrs", "uk")
+    age = decode_size_description("5-6 yrs", Locale.UK)
     assert age.sizes[0].raw == "5-6y"
     assert age.sizes[0].display() == "5-6 years"
 
-    petite = decode_size_description("Petite", "uk", product_type=ProductType.DRESSES)
+    petite = decode_size_description("Petite", Locale.UK, product_type=ProductType.DRESSES)
     assert petite.sizes[0].raw == "petite"
 
-    width = decode_size_description("UK 6 G", "uk", product_type=ProductType.SHOES)
+    width = decode_size_description("UK 6 G", Locale.UK, product_type=ProductType.SHOES)
     assert width.sizes[0].size_unit.locale.value == "uk"
     assert width.sizes[1].raw == "wide"
 
 
 def test_product_type_changes_a_bare_number():
-    dress = decode_size_description("12", "uk", product_type=ProductType.DRESSES)
-    shoe = decode_size_description("12", "uk", product_type=ProductType.SHOES)
+    dress = decode_size_description("12", Locale.UK, product_type=ProductType.DRESSES)
+    shoe = decode_size_description("12", Locale.UK, product_type=ProductType.SHOES)
     assert dress.sizes[0].size_type.slug == "dress"
     assert shoe.sizes[0].size_type.slug == "adult-shoe"
 
@@ -68,12 +69,12 @@ def test_product_type_changes_a_bare_number():
 def test_encode_prefers_region_without_converting_charts():
     uk = Size(10, UK_DRESS_SIZE)
     eu = Size(38, EU_DRESS_SIZE)
-    encoded = encode_size_description([eu, uk], "eu", preferred_regions=("uk", "eu"))
+    encoded = encode_size_description([eu, uk], Locale.EU, preferred_regions=(Locale.UK, Locale.EU))
     assert encoded.text == "UK 10"
     assert encoded.discarded[0].reason == "duplicate"
     assert encoded.discarded[0].text == "EU 38"
 
-    only_eu = encode_size_description([eu], "uk", preferred_regions=("uk", "eu"))
+    only_eu = encode_size_description([eu], Locale.UK, preferred_regions=(Locale.UK, Locale.EU))
     assert only_eu.text == "EU 38"
 
 
@@ -84,14 +85,14 @@ def test_units_carry_recognition_patterns():
         pattern.search('30"') for pattern in INCH_WAIST_SIZE.recognition_patterns()
     )
 
-    missing = decode_size_description("not-a-size", "uk")
+    missing = decode_size_description("not-a-size", Locale.UK)
     assert missing.sizes == ()
     assert missing.discarded[0].reason == "unrecognised"
 
     french = encode_size_description(
         [Size("regular", TROUSER_LENGTH_SIZE)],
-        "fr",
-        preferred_regions=("fr",),
+        Locale.FR,
+        preferred_regions=(Locale.FR,),
         product_type=ProductType.TROUSERS,
     )
     assert french.text == "Normal"
@@ -104,25 +105,25 @@ def _ids(decoded):
 @pytest.mark.parametrize(
     ("raw", "region", "product", "slug", "value"),
     [
-        ("UK 10", "eu", ProductType.DRESSES, "uk-dress-size", "10"),
-        ("UK-10", "uk", ProductType.DRESSES, "uk-dress-size", "10"),
-        ("EUR 38", "uk", ProductType.DRESSES, "eu-dress-size", "38"),
-        ("FR 38", "uk", ProductType.DRESSES, "eu-dress-size", "38"),
-        ("US 6", "uk", ProductType.DRESSES, "us-dress-size", "6"),
-        ("AU 10", "uk", ProductType.SKIRTS, "au-dress-size", "10"),
-        ("UK 7", "uk", ProductType.SHOES, "uk-adult-shoe-size", "7"),
-        ("EU 41", "uk", ProductType.BOOTS, "eu-adult-shoe-size", "41"),
-        ("US 8", "uk", ProductType.TRAINERS, "us-adult-shoe-size", "8"),
-        ("12", "eu", ProductType.DRESSES, "eu-dress-size", "12"),
-        ("12", "fr", ProductType.DRESSES, "eu-dress-size", "12"),
-        ("12", "us", ProductType.DRESSES, "us-dress-size", "12"),
-        ("12", "au", ProductType.NIGHTWEAR, "au-dress-size", "12"),
-        ("12", "uk", ProductType.SHOES, "uk-adult-shoe-size", "12"),
-        ("41", "eu", ProductType.SHOES, "eu-adult-shoe-size", "41"),
-        ("32", "uk", ProductType.JEANS, "uk-waist-size", "32"),
-        ("32", "us", ProductType.TROUSERS, "us-waist-size", "32"),
-        ("32", "eu", ProductType.JEANS, "eu-waist-size", "32"),
-        ("8", "uk", ProductType.SHORTS, "uk-waist-size", "8"),
+        ("UK 10", Locale.EU, ProductType.DRESSES, "uk-dress-size", "10"),
+        ("UK-10", Locale.UK, ProductType.DRESSES, "uk-dress-size", "10"),
+        ("EUR 38", Locale.UK, ProductType.DRESSES, "eu-dress-size", "38"),
+        ("FR 38", Locale.UK, ProductType.DRESSES, "eu-dress-size", "38"),
+        ("US 6", Locale.UK, ProductType.DRESSES, "us-dress-size", "6"),
+        ("AU 10", Locale.UK, ProductType.SKIRTS, "au-dress-size", "10"),
+        ("UK 7", Locale.UK, ProductType.SHOES, "uk-adult-shoe-size", "7"),
+        ("EU 41", Locale.UK, ProductType.BOOTS, "eu-adult-shoe-size", "41"),
+        ("US 8", Locale.UK, ProductType.TRAINERS, "us-adult-shoe-size", "8"),
+        ("12", Locale.EU, ProductType.DRESSES, "eu-dress-size", "12"),
+        ("12", Locale.FR, ProductType.DRESSES, "eu-dress-size", "12"),
+        ("12", Locale.US, ProductType.DRESSES, "us-dress-size", "12"),
+        ("12", Locale.AU, ProductType.NIGHTWEAR, "au-dress-size", "12"),
+        ("12", Locale.UK, ProductType.SHOES, "uk-adult-shoe-size", "12"),
+        ("41", Locale.EU, ProductType.SHOES, "eu-adult-shoe-size", "41"),
+        ("32", Locale.UK, ProductType.JEANS, "uk-waist-size", "32"),
+        ("32", Locale.US, ProductType.TROUSERS, "us-waist-size", "32"),
+        ("32", Locale.EU, ProductType.JEANS, "eu-waist-size", "32"),
+        ("8", Locale.UK, ProductType.SHORTS, "uk-waist-size", "8"),
     ],
 )
 def test_regional_and_bare_numbers(raw, region, product, slug, value):
@@ -166,7 +167,7 @@ def test_regional_and_bare_numbers(raw, region, product, slug, value):
     ],
 )
 def test_waist_compounds(raw, product, expected):
-    decoded = decode_size_description(raw, "uk", product_type=product)
+    decoded = decode_size_description(raw, Locale.UK, product_type=product)
     assert _ids(decoded) == expected
     assert decoded.format_id in {"waist-leg", "waist-length", "unit-patterns"}
 
@@ -181,7 +182,7 @@ def test_waist_compounds(raw, product, expected):
     ],
 )
 def test_bra_strings(raw, product, expected):
-    decoded = decode_size_description(raw, "uk", product_type=product)
+    decoded = decode_size_description(raw, Locale.UK, product_type=product)
     assert _ids(decoded) == expected
 
 
@@ -200,11 +201,11 @@ def test_bra_strings(raw, product, expected):
     ],
 )
 def test_age_bands(raw, token, display):
-    decoded = decode_size_description(raw, "uk")
+    decoded = decode_size_description(raw, Locale.UK)
     assert decoded.sizes[0].size_unit.slug == "age"
     assert decoded.sizes[0].raw == token
     assert decoded.sizes[0].display() == display
-    assert encode_size_description(decoded.sizes, "uk").text == display
+    assert encode_size_description(decoded.sizes, Locale.UK).text == display
 
 
 @pytest.mark.parametrize(
@@ -226,7 +227,7 @@ def test_age_bands(raw, token, display):
     ],
 )
 def test_proportion_and_length_words(raw, product, slug, token):
-    decoded = decode_size_description(raw, "uk", product_type=product)
+    decoded = decode_size_description(raw, Locale.UK, product_type=product)
     matched = [size for size in decoded.sizes if size.size_unit.slug == slug]
     assert matched and matched[0].raw == token
 
@@ -248,7 +249,7 @@ def test_proportion_and_length_words(raw, product, slug, token):
     ],
 )
 def test_shoe_widths(raw, product, token):
-    decoded = decode_size_description(raw, "uk", product_type=product)
+    decoded = decode_size_description(raw, Locale.UK, product_type=product)
     width = [size for size in decoded.sizes if size.size_type.slug == "shoe-width"]
     assert width and width[0].raw == token
 
@@ -264,7 +265,7 @@ def test_shoe_widths(raw, product, token):
     ],
 )
 def test_suffixed_lengths(raw, product, slug, value):
-    decoded = decode_size_description(raw, "uk", product_type=product)
+    decoded = decode_size_description(raw, Locale.UK, product_type=product)
     assert _ids(decoded) == [(slug, value)]
     assert decoded.confidence >= 0.9
 
@@ -274,7 +275,7 @@ def test_suffixed_lengths(raw, product, slug, value):
     ["", "   ", "not-a-size", "one size", "XXL", "S", "short sleeve", "Pace Breaker"],
 )
 def test_unrecognised_cells(raw):
-    decoded = decode_size_description(raw, "uk", product_type=ProductType.DRESSES)
+    decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.DRESSES)
     if raw.strip() == "":
         assert decoded.sizes == ()
         assert decoded.discarded == ()
@@ -287,14 +288,14 @@ def test_unrecognised_cells(raw):
 
 
 def test_product_type_rejects_a_cross_range_compound():
-    dresses = decode_size_description("30/32", "uk", product_type=ProductType.DRESSES)
-    jeans = decode_size_description("30/32", "uk", product_type=ProductType.JEANS)
+    dresses = decode_size_description("30/32", Locale.UK, product_type=ProductType.DRESSES)
+    jeans = decode_size_description("30/32", Locale.UK, product_type=ProductType.JEANS)
     assert jeans.format_id == "waist-leg"
     assert dresses.format_id != "waist-leg"
 
 
 def test_ambiguous_string_lowers_confidence_and_lists_alternatives():
-    decoded = decode_size_description("UK 10", "uk", product_type=ProductType.DRESSES)
+    decoded = decode_size_description("UK 10", Locale.UK, product_type=ProductType.DRESSES)
     assert "regional-number" in decoded.alternatives
     assert decoded.confidence <= 0.6
 
@@ -344,7 +345,7 @@ def test_inseam_accepts_l_prefix(raw, product, slug):
         match = unit.recognition_patterns()[0].fullmatch(raw)
         assert match is not None
         assert match.group("value") in {"32", "8", "9"}
-    decoded = decode_size_description(raw, "uk", product_type=product)
+    decoded = decode_size_description(raw, Locale.UK, product_type=product)
     assert decoded.sizes[0].size_unit.slug == slug
 
 
@@ -356,7 +357,7 @@ def test_inch_waist_accepts_w_prefix(raw):
     match = INCH_WAIST_SIZE.recognition_patterns()[0].fullmatch(raw)
     assert match is not None
     assert match.group("value") == "30"
-    decoded = decode_size_description(raw, "uk", product_type=ProductType.JEANS)
+    decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.JEANS)
     assert _ids(decoded)[0] == ("in-waist-size", "30")
 
 
@@ -395,21 +396,23 @@ def test_unit_pattern_extracts_the_sample(unit, sample):
 def test_encode_length_follows_preferred_region_unit():
     inches = Size(30, INCH_WAIST_SIZE)
     as_eu = encode_size_description(
-        [inches], "uk", preferred_regions=("eu",), product_type=ProductType.JEANS
+        [inches], Locale.UK, preferred_regions=(Locale.EU,), product_type=ProductType.JEANS
     )
     assert as_eu.used[0].size_unit.length_unit == "cm"
     assert "cm" in as_eu.text
 
     centimetres = Size(76.2, CM_WAIST_SIZE)
-    as_uk = encode_size_description([centimetres], "eu", preferred_regions=("uk",))
+    as_uk = encode_size_description(
+        [centimetres], Locale.EU, preferred_regions=(Locale.UK,)
+    )
     assert as_uk.used[0].size_unit.length_unit == "in"
 
 
 def test_encode_keeps_chart_size_when_preferred_region_is_absent():
     only_us = encode_size_description(
         [Size(6, US_DRESS_SIZE)],
-        "uk",
-        preferred_regions=("uk", "eu"),
+        Locale.UK,
+        preferred_regions=(Locale.UK, Locale.EU),
         product_type=ProductType.DRESSES,
     )
     assert only_us.text == "US 6"
@@ -423,8 +426,8 @@ def test_encode_discards_duplicate_regions_and_unused_parts():
             Size(38, EU_DRESS_SIZE),
             Size("petite", PROPORTION_SIZE),
         ],
-        "uk",
-        preferred_regions=("uk", "eu"),
+        Locale.UK,
+        preferred_regions=(Locale.UK, Locale.EU),
         product_type=ProductType.DRESSES,
         format="regional-number",
     )
@@ -438,7 +441,7 @@ def test_encode_discards_duplicate_regions_and_unused_parts():
 def test_encode_named_formats():
     bra = encode_size_description(
         [Size(34, UK_BAND_SIZE), Size("E", UK_CUP_SIZE)],
-        "uk",
+        Locale.UK,
         format="bra",
     )
     assert bra.text == "34E"
@@ -446,13 +449,13 @@ def test_encode_named_formats():
 
     shoe = encode_size_description(
         [Size(6, UK_ADULT_SHOE_SIZE), Size("wide", SHOE_WIDTH_SIZE)],
-        "uk",
+        Locale.UK,
         product_type=ProductType.SHOES,
     )
     assert shoe.format_id == "shoe"
     assert shoe.text == "UK 6 Wide"
 
-    age = encode_size_description([Size("0-3 months", AGE_SIZE)], "uk")
+    age = encode_size_description([Size("0-3 months", AGE_SIZE)], Locale.UK)
     assert age.text == "0-3 months"
     assert age.format_id == "age"
 
@@ -460,10 +463,10 @@ def test_encode_named_formats():
 @pytest.mark.parametrize(
     ("region", "expected"),
     [
-        ("uk", "Short"),
-        ("us", "Short"),
-        ("fr", "Court"),
-        ("eu", "Short"),
+        (Locale.UK, "Short"),
+        (Locale.US, "Short"),
+        (Locale.FR, "Court"),
+        (Locale.EU, "Short"),
     ],
 )
 def test_encode_translates_length_words(region, expected):
@@ -477,22 +480,26 @@ def test_encode_translates_length_words(region, expected):
 
 
 def test_encode_empty_and_unknown_format():
-    empty = encode_size_description([], "uk")
+    empty = encode_size_description([], Locale.UK)
     assert empty.text == ""
     assert empty.confidence == 0.0
     with pytest.raises(ValueError, match="Unknown size description format"):
-        encode_size_description([Size(10, UK_DRESS_SIZE)], "uk", format="nope")
+        encode_size_description([Size(10, UK_DRESS_SIZE)], Locale.UK, format="nope")
+    with pytest.raises(TypeError, match="Locale"):
+        decode_size_description("10", "uk")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="source_region"):
-        decode_size_description("10", "universal")
+        decode_size_description("10", Locale.UNIVERSAL)
+    with pytest.raises(TypeError, match="ProductType"):
+        decode_size_description("10", Locale.UK, product_type="dresses")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="preferred_regions"):
         encode_size_description(
-            [Size(10, UK_DRESS_SIZE)], "uk", preferred_regions=("universal",)
+            [Size(10, UK_DRESS_SIZE)],
+            Locale.UK,
+            preferred_regions=(Locale.UNIVERSAL,),
         )
 
 
-def test_source_region_accepts_locale_enum():
-    from fashion_size.types import Locale
-
+def test_source_region_is_a_locale():
     decoded = decode_size_description(
         "UK 8", Locale.US, product_type=ProductType.DRESSES
     )
@@ -501,15 +508,15 @@ def test_source_region_accepts_locale_enum():
 
 def test_whitespace_is_collapsed_before_matching():
     decoded = decode_size_description(
-        "  UK   10  ", "uk", product_type=ProductType.DRESSES
+        "  UK   10  ", Locale.UK, product_type=ProductType.DRESSES
     )
     assert decoded.sizes[0].raw == 10
 
 
 def test_jeans_slash_round_trips():
-    decoded = decode_size_description("W32 / L30", "uk", product_type=ProductType.JEANS)
+    decoded = decode_size_description("W32 / L30", Locale.UK, product_type=ProductType.JEANS)
     assert _ids(decoded) == [
         ("in-waist-size", "32"),
         ("in-trousers-inseam", "30"),
     ]
-    assert encode_size_description(decoded.sizes, "uk").text == "32/30"
+    assert encode_size_description(decoded.sizes, Locale.UK).text == "32/30"

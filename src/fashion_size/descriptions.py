@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from fashion_size.demographics import AgeGroup, Demographic, Gender
-from fashion_size.product_types import ProductType, resolve_product_type
+from fashion_size.product_types import ProductType
 from fashion_size.types import (
     AGE,
     AGE_SIZE,
@@ -55,7 +55,6 @@ from fashion_size.types import (
     length_value_in_range,
     normalize_cup_token,
     normalize_raw,
-    resolve_locale,
     size_unit_for_length_unit,
 )
 
@@ -263,10 +262,28 @@ def _prefix_locale(token: str, fallback: Locale) -> Locale:
     return fallback
 
 
+def _require_locale(value: Locale, *, name: str) -> Locale:
+    if not isinstance(value, Locale):
+        raise TypeError(f"{name} must be a Locale, not {type(value).__name__}.")
+    if value is Locale.UNIVERSAL:
+        raise ValueError(f"{name} must be a regional size system.")
+    return value
+
+
+def _require_product_type(value: ProductType | None) -> ProductType | None:
+    if value is None:
+        return None
+    if not isinstance(value, ProductType):
+        raise TypeError(
+            f"product_type must be a ProductType, not {type(value).__name__}."
+        )
+    return value
+
+
 def decode_size_description(
     value: str,
-    source_region: Locale | str,
-    product_type: ProductType | str | None = None,
+    source_region: Locale,
+    product_type: ProductType | None = None,
 ) -> DecodedSizeDescription:
     """Read one feed size string into size values.
 
@@ -275,10 +292,8 @@ def decode_size_description(
     confidence when several formats could fit. ``confidence`` is ``1`` when a
     single format matches, and lower when another format was also plausible.
     """
-    region = resolve_locale(source_region)
-    if region is Locale.UNIVERSAL:
-        raise ValueError("source_region must be a regional size system.")
-    product = None if product_type is None else resolve_product_type(product_type)
+    region = _require_locale(source_region, name="source_region")
+    product = _require_product_type(product_type)
     text = " ".join((value or "").strip().split())
     if not text:
         return DecodedSizeDescription((), None, 0.0, (), ())
@@ -730,13 +745,13 @@ _PARSERS = (
 
 
 def _preferred(
-    source: Locale, preferred_regions: Sequence[Locale | str] | None
+    source: Locale, preferred_regions: Sequence[Locale] | None
 ) -> tuple[Locale, ...]:
     if not preferred_regions:
         return (source,)
-    resolved = tuple(resolve_locale(item) for item in preferred_regions)
-    if any(item is Locale.UNIVERSAL for item in resolved):
-        raise ValueError("preferred_regions must be regional size systems.")
+    resolved = tuple(
+        _require_locale(item, name="preferred_regions") for item in preferred_regions
+    )
     return resolved
 
 
@@ -758,9 +773,9 @@ def _same_measurement(left: Size, right: Size) -> bool:
 
 def encode_size_description(
     values: Iterable[Size],
-    source_region: Locale | str,
-    preferred_regions: Sequence[Locale | str] | None = None,
-    product_type: ProductType | str | None = None,
+    source_region: Locale,
+    preferred_regions: Sequence[Locale] | None = None,
+    product_type: ProductType | None = None,
     format: str | None = None,
 ) -> EncodedSizeDescription:
     """Join size values into one readable string.
@@ -772,11 +787,9 @@ def encode_size_description(
     and centimetres when the preferred region uses the other unit. An empty
     ``preferred_regions`` reuses ``source_region``.
     """
-    source = resolve_locale(source_region)
-    if source is Locale.UNIVERSAL:
-        raise ValueError("source_region must be a regional size system.")
+    source = _require_locale(source_region, name="source_region")
     order = _preferred(source, preferred_regions)
-    product = None if product_type is None else resolve_product_type(product_type)
+    product = _require_product_type(product_type)
     incoming = tuple(values)
     chosen, discarded = _choose_values(incoming, order, source)
     if format is not None and format not in _ENCODERS:

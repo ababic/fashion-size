@@ -53,13 +53,16 @@ Today, shipped brand overrides are concentrated in selected dress and shoe chart
 ```python
 from fashion_size.descriptions import decode_size_description, encode_size_description
 from fashion_size.product_types import ProductType
+from fashion_size.types import Locale
 
-decoded = decode_size_description("30/32", "uk", product_type=ProductType.JEANS)
+decoded = decode_size_description("30/32", Locale.UK, product_type=ProductType.JEANS)
 decoded.format_id  # "waist-leg"
 decoded.confidence
 decoded.sizes
 
-encode_size_description(decoded.sizes, "uk", preferred_regions=("uk", "eu")).text
+encode_size_description(
+    decoded.sizes, Locale.UK, preferred_regions=(Locale.UK, Locale.EU)
+).text
 ```
 
 `confidence` drops when another format was also plausible. `discarded` lists tokens that were duplicates or not recognised. `preferred_regions` works like a catalog import preference list: the first region that is already present wins. Omit it and `source_region` is used.
