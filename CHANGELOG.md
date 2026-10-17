@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `sleeve` length size type (28–40 in). A dress shirt `15.5/34` is collar and sleeve, both inches.
+- Description decoding skips exception phrases that look like sizes: pack counts, years, `Petite Edit`, and `long sleeve`.
+- Label size types `trouser-length`, `top-length`, `shoe-width`, `proportion`, `age-months`, `age-years`, and `letter`. Tokens are canonical (`regular`, `extra-wide`, `5-6`, `2XL`, `ONE`). Month bands accept `months`, `month`, `mths`, `mth`, and `m`. Letter sizes accept `S`/`small`, `XXL`/`2XL`, and `one size`. They do not use conversion charts.
+- `fashion_size.descriptions.decode_size_description` and `encode_size_description` recognise feed size strings and join size values back into one string. The module is not imported with the package. `source_region`, `preferred_regions`, and `product_type` take `Locale` and `ProductType` values. Chart sizes stay in the region they were found in. Length values can move between inches and centimetres for a preferred region. Results include a confidence score and discarded tokens.
+
 ## 2026.10.17
 
 - `shorts-inseam` and `trousers-inseam` length size types with non-overlapping inch bounds 2–22 and 24–42 (retail-aligned, with headroom for long shorts and big-and-tall trousers). Formula conversion rejects values outside each type's range. Generic `inside-leg` keeps the 5–150 inch clothing range.

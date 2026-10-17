@@ -40,10 +40,32 @@ The source repository is [github.com/ababic/fashion-size](https://github.com/aba
 | Band (`band-size`) | `uk-band-size`, `eu-band-size`, `us-band-size`, `au-band-size`, `fr-band-size` | Fixed default chart lookup | UK/US are inch labels, EU is centimetre label, AU is dress-style number, and FR is EU + 15. Brand overrides are intentionally disabled for this type. |
 | Waist label (`waist-size`) | `uk-waist-size`, `eu-waist-size`, `us-waist-size`, `au-waist-size` | Brand-variable chart lookup | UK/US/AU waist labels are inch-based. EU waist is a shared regional unit: adult rows use continental labels, while child rows use centimetres. |
 | Chest label (`chest-size`) | `uk-chest-size`, `eu-chest-size`, `us-chest-size`, `au-chest-size` (`fr-chest-size` resolves to EU) | Brand-variable chart lookup | UK/US/AU chest labels are inch-based. EU chest is a shared regional unit: adult rows use continental labels, while child rows use centimetres. French chest labels match EU. |
-| Body measurements (`chest`, `waist`, `collar`) | `cm-chest-size`, `in-waist-size`, `in-collar-size`, etc. | Fixed formula conversion | Tape-measure style values in `in`/`cm`. Bounds: chest 18–88, waist 16–85, collar 11–28 (children through big-and-tall, with headroom). Each exposes `length_range` on the size type. |
+| Body measurements (`chest`, `waist`, `collar`, `sleeve`) | `cm-chest-size`, `in-waist-size`, `in-collar-size`, `in-sleeve-length`, etc. | Fixed formula conversion | Tape-measure style values in `in`/`cm`. Bounds: chest 18–88, waist 16–85, collar 11–28, sleeve 28–40. A dress shirt `15.5/34` is collar and sleeve, both inches. Each exposes `length_range` on the size type. |
 | Leg length / inseam (`inside-leg`, `shorts-inseam`, `trousers-inseam`) | `in-inside-leg`, `in-shorts-inseam`, `in-trousers-inseam`, and `cm-*` pairs | Fixed formula conversion | Garment inside-leg / inseam in `in`/`cm`. Prefer `shorts-inseam` (2–22 in) or `trousers-inseam` (24–42 in) on product data so values cannot sit on the wrong attribute. Generic `inside-leg` / `leg-length` accepts 2–42 in when the catalog has not split shorts vs trousers. |
+| Label sizes (`trouser-length`, `top-length`, `shoe-width`, `proportion`, `age-months`, `age-years`, `letter`) | one universal unit per type (`trouser-length`, `letter`, …) | None | Sold-as words, age bands, and generic letter sizes (`XXS` through `6XL`, plus `ONE` for one size). `raw` is a canonical token (`regular`, `extra-wide`, `5-6`, `2XL`). Month units include `months`, `month`, `mths`, `mth`, and `m`. Synonyms fold in (`R`, `std`, `XXL`, `small`). They are not on locale charts. |
 
 Today, shipped brand overrides are concentrated in selected dress and shoe charts. Types still marked as brand-variable above continue to fall back to default scales when no matching brand chart exists for the brand, demographic, product type, and `as_of` capture instant.
+
+## Size description strings
+
+`fashion_size.descriptions` is imported only when you call it. It recognises common feed strings and joins size values back into one string. Chart sizes stay in the region they were written in. Length values can move between inches and centimetres. Label wording follows `preferred_regions`.
+
+```python
+from fashion_size.descriptions import decode_size_description, encode_size_description
+from fashion_size.product_types import ProductType
+from fashion_size.types import Locale
+
+decoded = decode_size_description("30/32", Locale.UK, product_type=ProductType.JEANS)
+decoded.format_id  # "waist-leg"
+decoded.confidence
+decoded.sizes
+
+encode_size_description(
+    decoded.sizes, Locale.UK, preferred_regions=(Locale.UK, Locale.EU)
+).text
+```
+
+`confidence` drops when another format was also plausible. `discarded` lists tokens that were duplicates, ranges, or not recognised. A range such as `UK 8-10` is not a size. A cell with several regions, such as `EU 38 / UK 10` or `41 (UK 7.5)`, returns each region. `preferred_regions` then keeps the first of those that is present. Omit it and `source_region` is used. Chart sizes are not converted onto a chart.
 
 ## Brand charts
 
