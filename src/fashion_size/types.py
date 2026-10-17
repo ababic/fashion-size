@@ -94,7 +94,7 @@ class MissingScaleError(ValueError):
 
 
 class LengthOutOfRangeError(ValueError):
-    """Length is outside the clothing / accessories / curtain range (5–150 inches)."""
+    """Length is outside the inclusive inch range for its size type."""
 
 
 def _finite_decimal(value: int | float | str | Decimal) -> Decimal:
@@ -415,6 +415,7 @@ def format_age_gender(age_group: str, gender: str) -> str:
     return f"{age_group_label(age_group)} / {gender_label(gender)}"
 
 
+# Fallback when a length size type omits ``length_min_inches`` / ``length_max_inches``.
 DEFAULT_LENGTH_MIN_INCHES = Decimal("5")
 DEFAULT_LENGTH_MAX_INCHES = Decimal("150")
 # Matches ``fashion_size.conversion.CM_PER_INCH`` (kept here to avoid import cycles).
@@ -556,13 +557,31 @@ CHEST_SIZE = SizeType(
     "Chest size",
     slug_stem="chest-size",
 )
-CHEST = SizeType(SizeTypeSlug.CHEST, SizeFamily.LENGTH, "Chest", ("chest-size",))
-WAIST = SizeType(SizeTypeSlug.WAIST, SizeFamily.LENGTH, "Waist", ("waist-size",))
+# Body measurements (in/cm formula types). Bounds follow default chart spans,
+# children's school-uniform rows, and big-and-tall retail with headroom.
+CHEST = SizeType(
+    SizeTypeSlug.CHEST,
+    SizeFamily.LENGTH,
+    "Chest",
+    ("chest-size",),
+    length_min_inches=Decimal("18"),
+    length_max_inches=Decimal("88"),
+)
+WAIST = SizeType(
+    SizeTypeSlug.WAIST,
+    SizeFamily.LENGTH,
+    "Waist",
+    ("waist-size",),
+    length_min_inches=Decimal("16"),
+    length_max_inches=Decimal("85"),
+)
 INSIDE_LEG = SizeType(
     SizeTypeSlug.INSIDE_LEG,
     SizeFamily.LENGTH,
     "Inside leg",
     ("inside-leg", "leg-length"),
+    length_min_inches=Decimal("15"),
+    length_max_inches=Decimal("50"),
 )
 # Inseam bounds follow common retail spans (athletic/bermuda shorts through big &
 # tall long cargo ~18 in) with headroom to 22 in for long-short SKUs. Trousers
@@ -584,7 +603,14 @@ TROUSERS_INSEAM = SizeType(
     length_min_inches=Decimal("24"),
     length_max_inches=Decimal("42"),
 )
-COLLAR = SizeType(SizeTypeSlug.COLLAR, SizeFamily.LENGTH, "Collar", ("collar-size",))
+COLLAR = SizeType(
+    SizeTypeSlug.COLLAR,
+    SizeFamily.LENGTH,
+    "Collar",
+    ("collar-size",),
+    length_min_inches=Decimal("11"),
+    length_max_inches=Decimal("28"),
+)
 
 SIZE_TYPES: tuple[SizeType, ...] = (
     DRESS,
