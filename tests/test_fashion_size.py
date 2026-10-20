@@ -12,12 +12,14 @@ import pytest
 
 import fashion_size.charts as charts
 from fashion_size import (
+    PRODUCT_TYPE_FAMILIES,
     PRODUCT_TYPES,
     SUPPORTED_BRANDS,
     ConversionSourceKind,
     DefaultChartReason,
     Demographic,
     ProductType,
+    ProductTypeFamily,
     __version__,
     register_display_language,
 )
@@ -732,6 +734,45 @@ def test_suit_jackets_resolves_to_suits():
     assert not hasattr(ProductType, "SUIT_JACKETS")
     assert "suit-jackets" not in PRODUCT_TYPE_SLUGS
     assert resolve_product_type("suit-jackets") is ProductType.SUITS
+
+
+def test_every_product_type_belongs_to_one_family():
+    assert set(ProductTypeFamily) == set(PRODUCT_TYPE_FAMILIES)
+    seen: list[ProductType] = []
+    for family in ProductTypeFamily:
+        assert family.label
+        seen.extend(family.product_types)
+    assert set(seen) == set(ProductType)
+    assert len(seen) == len(ProductType)
+
+    assert ProductType.JEANS.family is ProductTypeFamily.BOTTOMS
+    assert ProductType.TROUSERS.family is ProductType.SHORTS.family
+    assert ProductType.SUITS.family is ProductTypeFamily.BOTTOMS
+    assert ProductType.SUITS.profile.chest_span == (34, 60)
+    assert ProductType.OUTERWEAR.family is ProductTypeFamily.TOPS
+    assert ProductType.OUTERWEAR.profile.chest_span == (34, 60)
+    assert ProductType.SHIRTS.profile.collar_sleeve == (14, 22, 28, 40)
+    assert ProductType.SHIRTS.profile.collar_span is None
+    assert ProductType.DRESS_SHIRTS.profile.collar_span == (14, 22)
+    assert ProductType.DRESS_SHIRTS.profile.collar_sleeve == (14, 22, 28, 40)
+    assert ProductType.SHOES.family is ProductType.BOOTS.family is ProductTypeFamily.FOOTWEAR
+    assert ProductType.DRESSES.family is ProductType.SKIRTS.family is ProductTypeFamily.DRESSES
+    assert ProductType.BRAS.family is ProductTypeFamily.BRAS
+    assert ProductType.UNDERWEAR.family is ProductTypeFamily.OTHER
+    assert ProductType.HOSIERY.family is ProductTypeFamily.OTHER
+    assert ProductType.ACTIVEWEAR_BOTTOMS.family is ProductTypeFamily.OTHER
+    assert ProductType.CASUAL_TOPS.takes_letter_size
+    assert ProductType.UNDERWEAR.takes_letter_size
+    assert not ProductType.BRAS.takes_letter_size
+    assert not ProductType.SHOES.takes_letter_size
+    assert not ProductType.ACTIVEWEAR_BOTTOMS.takes_letter_size
+    assert ProductTypeFamily.BOTTOMS.bare_waist_span == (24, 44)
+    assert ProductTypeFamily.BOTTOMS.chart_waist_span == (24, 50)
+    assert ProductTypeFamily.TOPS.length_slug == "top-length"
+    assert ProductTypeFamily.BOTTOMS.length_slug == "trouser-length"
+    assert ProductTypeFamily.DRESSES.accepts_fit_code
+    assert ProductTypeFamily.TOPS.accepts_fit_code
+    assert not ProductTypeFamily.BOTTOMS.accepts_fit_code
 
 
 def test_chart_with_no_product_types_covers_every_product_type():

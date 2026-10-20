@@ -25,7 +25,7 @@ Guidance for agents working in this repository (`fashion-size`).
 - `src/fashion_size/brands.py`
   - Brand catalog and override chart metadata (`OverrideChart`).
 - `src/fashion_size/product_types.py`, `size_types.py`, `demographics.py`
-  - Canonical enums/labels/resolvers used by lookup logic.
+ - Canonical enums/labels/resolvers used by lookup logic. `ProductTypeFamily` groups product types that share a feed-size reading. Each `ProductType` carries a `ProductTypeProfile` (family, plus collar and chest spans).
 - `tests/test_fashion_size.py`
   - Primary behavior regression suite (single comprehensive test module).
 - `README.md`, `CHANGELOG.md`

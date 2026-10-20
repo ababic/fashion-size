@@ -48,7 +48,7 @@ Today, shipped brand overrides are concentrated in selected dress and shoe chart
 
 ## Size description strings
 
-`fashion_size.descriptions` is imported only when you call it. It recognises common feed strings and joins size values back into one string. Chart sizes stay in the region they were written in. Length values can move between inches and centimetres. Label wording follows `preferred_regions`.
+`fashion_size.descriptions` is imported only when you call it. It recognises common feed strings and joins size values back into one string. The product type's family chooses how an unlabelled number is read. Chart sizes stay in the region they were written in. Length values can move between inches and centimetres. Label wording follows `preferred_regions`, from the vocabulary on the label size type.
 
 ```python
 from fashion_size.descriptions import decode_size_description, encode_size_description
@@ -83,7 +83,7 @@ chart.source_notes
 chart.rows
 ```
 
-`ProductType` is the list of ranges a brand chart can cover on its own (jeans, trousers, shorts, skirts, bras, swimwear, nightwear, hosiery, outerwear, shoes, boots, and so on). A chart names the product types it replaces.
+`ProductType` is the list of ranges a brand chart can cover on its own (jeans, trousers, shorts, skirts, bras, swimwear, nightwear, hosiery, outerwear, shoes, boots, and so on). A chart names the product types it replaces. Each product type belongs to a `ProductTypeFamily` (`bottoms`, `tops`, `footwear`, `dresses`, `bras`, `other`). A family is the shared way of reading an unlabelled size: jeans and trousers are both bottoms, dresses and skirts are both dresses. A product type's profile adds the cases that are not shared, such as a suit chest size or a dress-shirt collar and sleeve.
 
 Each override chart is a JSON file named by id under `src/fashion_size/fixtures/charts`. The file holds the rows, the source page, and any notes about that table. Which brand it belongs to, the size type and demographic, when it was last checked, and when its rows take effect live in `fashion_size.brands`. A later chart for the same size type, demographic, and product types replaces the earlier one: `effective_until` is that next start, or none while the chart is current. A brand with no charts there matches the default charts. Superseded charts stay in the catalog.
 

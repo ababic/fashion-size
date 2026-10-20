@@ -7,7 +7,12 @@ Django fields live in ``django-fashion-size``.
 from fashion_size.__version__ import __version__
 from fashion_size.brands import SUPPORTED_BRANDS, BrandName
 from fashion_size.demographics import Demographic
-from fashion_size.product_types import PRODUCT_TYPES, ProductType
+from fashion_size.product_types import (
+    PRODUCT_TYPE_FAMILIES,
+    PRODUCT_TYPES,
+    ProductType,
+    ProductTypeFamily,
+)
 from fashion_size.types import (
     ConversionSource,
     ConversionSourceKind,
@@ -21,8 +26,10 @@ __all__ = [
     "ConversionSourceKind",
     "DefaultChartReason",
     "Demographic",
+    "PRODUCT_TYPE_FAMILIES",
     "PRODUCT_TYPES",
     "ProductType",
+    "ProductTypeFamily",
     "SUPPORTED_BRANDS",
     "__version__",
     "register_display_language",

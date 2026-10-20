@@ -8,6 +8,7 @@ from fashion_size.types import (
     AGE_MONTHS_SIZE,
     AGE_YEARS_SIZE,
     CM_WAIST_SIZE,
+    DRESS,
     EU_ADULT_SHOE_SIZE,
     EU_DRESS_SIZE,
     INCH_COLLAR_SIZE,
@@ -15,6 +16,7 @@ from fashion_size.types import (
     INCH_SHORTS_INSEAM,
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
+    LETTER,
     LETTER_SIZE,
     PROPORTION_SIZE,
     SHOE_WIDTH_SIZE,
@@ -25,6 +27,7 @@ from fashion_size.types import (
     UK_CUP_SIZE,
     UK_DRESS_SIZE,
     US_DRESS_SIZE,
+    WAIST,
     Locale,
     Size,
 )
@@ -175,6 +178,11 @@ def test_real_size_tokens_survive_exception_patterns():
 def test_dress_fit_code_and_shirt_collar_sleeve():
     dress = decode_size_description("16T", Locale.UK, product_type=ProductType.DRESSES)
     assert [size.raw for size in dress.sizes] == [16, "tall"]
+
+    long = decode_size_description("16L", Locale.UK, product_type=ProductType.DRESSES)
+    assert long.format_id == "numbered-fit"
+    assert [size.raw for size in long.sizes] == [16, "long"]
+    assert Size("L", PROPORTION_SIZE).raw == "long"
 
     shirt = decode_size_description(
         "15.5/34", Locale.UK, product_type=ProductType.DRESS_SHIRTS
@@ -654,6 +662,34 @@ def test_whitespace_is_collapsed_before_matching():
         "  UK   10  ", Locale.UK, product_type=ProductType.DRESSES
     )
     assert decoded.sizes[0].raw == 10
+
+
+def test_size_types_own_the_product_types_they_belong_with():
+    assert ProductType.DRESSES in DRESS.affinity
+    assert ProductType.SHOES not in DRESS.affinity
+    assert DRESS.bare_without_product
+    assert ProductType.JEANS in WAIST.affinity
+    assert WAIST.feed_mark == "W"
+    assert LETTER.vocabulary is not None
+    assert LETTER.vocabulary.canonical("small") == "S"
+    assert ProductType.BRAS not in LETTER.affinity
+
+
+def test_shoe_width_wording_follows_the_region():
+    encoded = encode_size_description(
+        [Size("standard", SHOE_WIDTH_SIZE)],
+        Locale.US,
+        preferred_regions=(Locale.US,),
+        product_type=ProductType.SHOES,
+    )
+    assert encoded.text == "Medium"
+    french = encode_size_description(
+        [Size("wide", SHOE_WIDTH_SIZE)],
+        Locale.FR,
+        preferred_regions=(Locale.FR,),
+        product_type=ProductType.SHOES,
+    )
+    assert french.text == "Large"
 
 
 def test_jeans_slash_round_trips():

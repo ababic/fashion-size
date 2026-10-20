@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A numbered fit such as `16L` on a dress or top is a dress size plus proportion `long`. That code used to raise.
+- Each `ProductType` belongs to a `ProductTypeFamily` (`bottoms`, `tops`, `footwear`, `dresses`, `bras`, `other`) and carries a `ProductTypeProfile` for the readings that are not shared: a suit or outerwear number in the jacket range is a chest size, and a shirt can pair a collar with a sleeve. Feed decoding asks the family and the profile. Each size type names the product types it belongs with. Label size types own their tokens, synonyms, and regional wording.
 - `sleeve` length size type (28–40 in). A dress shirt `15.5/34` is collar and sleeve, both inches.
 - Description decoding skips exception phrases that look like sizes: pack counts, years, `Petite Edit`, and `long sleeve`.
 - Label size types `trouser-length`, `top-length`, `shoe-width`, `proportion`, `age-months`, `age-years`, and `letter`. Tokens are canonical (`regular`, `extra-wide`, `5-6`, `2XL`, `ONE`). Month bands accept `months`, `month`, `mths`, `mth`, and `m`. Letter sizes accept `S`/`small`, `XXL`/`2XL`, and `one size`. They do not use conversion charts.
