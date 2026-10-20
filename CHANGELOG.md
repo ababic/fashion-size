@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2026.10.20
+
 - Label size types, their units, and label sizes can be hashed. A vocabulary stores its token pairs as tuples.
 - With no product type, a lone `EU` or `FR` number in the adult shoe span (35–50) is an EU adult shoe size. `FR 90` stays a French band. A cup letter on a dress, skirt, nightwear, or swimwear product is not read as a cup size.
 - Encoding a length that falls outside the target unit's range discards it with reason `out-of-range`. Feed bra strings such as `32DD` stay UK inch bands (28–56).
