@@ -73,6 +73,9 @@ _UNLABELLED_EU_SHOE = (35, 50)
 _EXPLICIT_SCORE = 0.82
 _BARE_SCORE = 0.48
 _LOCALE_BONUS = 0.05
+# Beats an explicit label plus its locale bonus, so a lone ``EU 40`` or ``FR 40``
+# with no product type is an adult shoe rather than a dress or a French band.
+_UNLABELLED_SHOE_SCORE = 0.88
 _MARKED_BONUS = 0.12
 _MARKED_SPAN_BONUS = 0.05
 _AMBIGUITY_PENALTY = 0.45
@@ -443,6 +446,14 @@ class SizeDescription:
             return None
         if not explicit and not unit.size_type.allows_bare_feed_value(product):
             return None
+        # Dress, skirt, nightwear, and swimwear sizes are dress sizes. A cup
+        # letter on that number is not a second size.
+        if (
+            unit.size_type is CUP_SIZE
+            and product is not None
+            and product.family.reads_dress_size
+        ):
+            return None
         score = _EXPLICIT_SCORE if explicit else _BARE_SCORE
         score += unit.size_type.affinity_adjustment(product)
         score += _cross_type_penalty(unit.size_type, size.raw, product)
@@ -574,10 +585,14 @@ class SizeDescription:
         locale = _prefix_locale(match.group(1), region)
         number = _number(match.group(2))
         if self._reads_as_shoe(product, locale, number):
+            if product is not None and product.family.reads_shoe_size:
+                score = 0.9
+            else:
+                score = _UNLABELLED_SHOE_SCORE
             return _Hit(
                 SizeDescriptionFormat.REGIONAL_NUMBER,
                 (Size(number, self._shoe_unit(locale)),),
-                0.9 if product is not None and product.family.reads_shoe_size else 0.7,
+                score,
             )
         if product is None or product.family.reads_dress_size:
             score = (
@@ -654,8 +669,6 @@ class SizeDescription:
             score = 0.95
         elif product is None:
             score = 0.8
-        elif product.family.reads_dress_size:
-            score = 0.4
         else:
             return None
         # Feed bra strings are read as a UK inch band. The cup letter is universal.

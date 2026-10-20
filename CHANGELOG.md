@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Label size types, their units, and label sizes can be hashed. A vocabulary stores its token pairs as tuples.
-- A French prefix is folded onto EU before the unlabelled shoe-span guess, for a lone cell and a multi-region cell. A lone `FR 40` stays a French band size. `FR 40 / UK 6` reads the French number as an EU adult shoe.
+- With no product type, a lone `EU` or `FR` number in the adult shoe span (35–50) is an EU adult shoe size. `FR 90` stays a French band. A cup letter on a dress, skirt, nightwear, or swimwear product is not read as a cup size.
 - Encoding a length that falls outside the target unit's range discards it with reason `out-of-range`. Feed bra strings such as `32DD` stay UK inch bands (28–56).
 - A numbered fit such as `16L` on a dress or top is a dress size plus proportion `long`. That code used to raise.
 - Each `ProductType` belongs to a `ProductTypeFamily` (`bottoms`, `tops`, `footwear`, `dresses`, `bras`, `other`) and carries a `ProductTypeProfile` for the readings that are not shared: a suit or outerwear number in the jacket range is a chest size, and a shirt can pair a collar with a sleeve. Feed decoding asks the family and the profile. Each size type names the product types it belongs with. Label size types own their tokens, synonyms, and regional wording.

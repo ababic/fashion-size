@@ -764,21 +764,49 @@ def test_bare_length_code_is_not_a_length_word():
     assert "length-word" in word.alternatives
 
 
-def test_french_prefix_folds_before_the_shoe_guess():
-    """FR is folded onto EU before the 35–50 shoe guess.
+def test_unlabelled_eu_span_is_an_adult_shoe():
+    """A lone EU or FR number in 35–50 is a shoe when no product type is set.
 
-    A lone ``FR 40`` is still a French band: that explicit label scores higher
-    than the shoe guess. The same fold is what a multi-region cell uses, so
-    ``FR 40 / UK 6`` reads 40 as an EU adult shoe.
+    The same fold applies in a multi-region cell. A French band above that
+    span stays a band, and a dress product keeps the dress reading.
     """
-    lone = decode_size_description("FR 40", Locale.UK)
-    assert lone.sizes[0].size_unit.slug == "fr-band-size"
-    assert lone.sizes[0].raw == 40
-    assert "regional-number" in lone.alternatives
+    for raw in ("EU 40", "FR 40", "FR 36"):
+        decoded = decode_size_description(raw, Locale.UK)
+        assert decoded.format_id == "regional-number"
+        assert decoded.sizes[0].size_unit is EU_ADULT_SHOE_SIZE
+        assert decoded.sizes[0].raw == int(raw.split()[1])
+
+    band = decode_size_description("FR 90", Locale.UK)
+    assert band.sizes[0].size_unit.slug == "fr-band-size"
+    assert band.sizes[0].raw == 90
+
+    dress = decode_size_description(
+        "EU 40", Locale.UK, product_type=ProductType.DRESSES
+    )
+    assert dress.sizes[0].size_unit.slug == "eu-dress-size"
 
     paired = decode_size_description("FR 40 / UK 6", Locale.UK)
     assert paired.sizes[0].size_unit is EU_ADULT_SHOE_SIZE
     assert paired.sizes[0].raw == 40
+
+
+def test_cup_letter_is_ignored_on_a_dress_product():
+    dress = decode_size_description(
+        "32DD", Locale.UK, product_type=ProductType.DRESSES
+    )
+    assert [size.size_unit.slug for size in dress.sizes] == ["uk-dress-size"]
+    assert dress.sizes[0].raw == 32
+
+    skirt = decode_size_description(
+        "32DD", Locale.UK, product_type=ProductType.SKIRTS
+    )
+    assert [size.size_type.slug for size in skirt.sizes] == ["dress"]
+
+    bra = decode_size_description("32DD", Locale.UK, product_type=ProductType.BRAS)
+    assert [size.size_unit.slug for size in bra.sizes] == [
+        "uk-band-size",
+        "uk-cup-size",
+    ]
 
 
 def test_bra_band_stays_a_uk_inch_band():
