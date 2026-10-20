@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Label size types, their units, and label sizes can be hashed. A vocabulary stores its token pairs as tuples.
+- With no product type, a lone `EU` or `FR` number in the adult shoe span (35–50) is an EU adult shoe size. `FR 90` stays a French band. A cup letter on a dress, skirt, nightwear, or swimwear product is not read as a cup size.
+- Encoding a length that falls outside the target unit's range discards it with reason `out-of-range`. Feed bra strings such as `32DD` stay UK inch bands (28–56).
+- A numbered fit such as `16L` on a dress or top is a dress size plus proportion `long`. That code used to raise.
+- Each `ProductType` belongs to a `ProductTypeFamily` (`bottoms`, `tops`, `footwear`, `dresses`, `bras`, `other`) and carries a `ProductTypeProfile` for the readings that are not shared: a suit or outerwear number in the jacket range is a chest size, and a shirt can pair a collar with a sleeve. Feed decoding asks the family and the profile. Each size type names the product types it belongs with. Label size types own their tokens, synonyms, and regional wording.
+- `sleeve` length size type (28–40 in). A dress shirt `15.5/34` is collar and sleeve, both inches.
+- Description decoding skips exception phrases that look like sizes: pack counts, years, `Petite Edit`, and `long sleeve`.
+- Label size types `trouser-length`, `top-length`, `shoe-width`, `proportion`, `age-months`, `age-years`, and `letter`. Tokens are canonical (`regular`, `extra-wide`, `5-6`, `2XL`, `ONE`). Month bands accept `months`, `month`, `mths`, `mth`, and `m`. Letter sizes accept `S`/`small`, `XXL`/`2XL`, and `one size`. They do not use conversion charts.
+- `fashion_size.descriptions.decode_size_description` and `encode_size_description` recognise feed size strings and join size values back into one string. The module is not imported with the package. `source_region`, `preferred_regions`, and `product_type` take `Locale` and `ProductType` values. Chart sizes stay in the region they were found in. Length values can move between inches and centimetres for a preferred region. Results include a confidence score and discarded tokens.
+
 ## 2026.10.17
 
 - `shorts-inseam` and `trousers-inseam` length size types with non-overlapping inch bounds 2–22 and 24–42 (retail-aligned, with headroom for long shorts and big-and-tall trousers). Formula conversion rejects values outside each type's range. Generic `inside-leg` keeps the 5–150 inch clothing range.

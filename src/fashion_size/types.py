@@ -9,11 +9,13 @@ A ``Size`` is an amount in a ``SizeUnit``, such as ``UK_DRESS_SIZE`` or
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
+from functools import lru_cache
 from typing import Literal
 
 from fashion_size.brands import BrandName
@@ -26,7 +28,7 @@ from fashion_size.demographics import (
     age_group_label,
     gender_label,
 )
-from fashion_size.product_types import ProductType
+from fashion_size.product_types import ProductType, ProductTypeFamily
 from fashion_size.size_types import SizeTypeSlug
 
 
@@ -40,14 +42,16 @@ class SizeFamily(StrEnum):
     BAND_SIZE = "band_size"
     WAIST_SIZE = "waist_size"
     CHEST_SIZE = "chest_size"
+    LABEL = "label"
 
     @property
     def supports_brand_overrides(self) -> bool:
         """Locale charts can be replaced per brand.
 
         Length uses a formula. Band size always uses the default chart.
+        Label sizes (length words, shoe width, proportion, age) do not convert.
         """
-        return self not in {SizeFamily.LENGTH, SizeFamily.BAND_SIZE}
+        return self not in {SizeFamily.LENGTH, SizeFamily.BAND_SIZE, SizeFamily.LABEL}
 
     @property
     def french_matches_eu(self) -> bool:
@@ -439,10 +443,145 @@ class LengthRange:
 
 
 @dataclass(frozen=True, slots=True)
+class LabelVocabulary:
+    """Tokens, synonyms, and wording for a label size type.
+
+    Pairs are stored as tuples so a frozen size type that owns a vocabulary
+    can be hashed. ``display`` maps a canonical token to English. ``aliases``
+    maps a folded synonym (case and hyphens folded) onto that token.
+    ``regional`` replaces the English word for one locale. ``shorthand`` is
+    the short letter used in a compound such as ``30L``. ``patterns`` are
+    recognition expressions, each with a ``value`` group. ``age_unit`` is
+    ``months`` or ``years`` when the token is an age band rather than a word.
+    """
+
+    display: tuple[tuple[str, str], ...] = ()
+    aliases: tuple[tuple[str, str], ...] = ()
+    regional: tuple[tuple[str, tuple[tuple[Locale, str], ...]], ...] = ()
+    shorthand: tuple[tuple[str, str], ...] = ()
+    patterns: tuple[str, ...] = ()
+    age_unit: str = ""
+
+    def canonical(self, raw: object) -> str:
+        """Fold ``raw`` into the stored token."""
+        if self.age_unit:
+            return self._age_token(str(raw))
+        text = str(raw).strip()
+        key = " ".join(text.replace("-", " ").casefold().split())
+        aliases = dict(self.aliases)
+        if key in aliases:
+            return aliases[key]
+        token = key.replace(" ", "-")
+        if token in dict(self.display):
+            return token
+        raise ValueError(raw)
+
+    def text(self, token: str, locale: Locale | None = None) -> str:
+        """Word for ``token``, using ``locale`` when this vocabulary has one."""
+        if self.age_unit:
+            return self._age_text(token)
+        if locale is not None:
+            translated = dict(self.regional_words(token)).get(locale)
+            if translated is not None:
+                return translated
+        try:
+            return dict(self.display)[token]
+        except KeyError as exc:
+            raise ValueError(token) from exc
+
+    def regional_words(self, token: str) -> tuple[tuple[Locale, str], ...]:
+        for name, words in self.regional:
+            if name == token:
+                return words
+        return ()
+
+    def shorthand_for(self, token: str) -> str:
+        """Short letter for a compound such as ``30L``, or ``""``."""
+        return dict(self.shorthand).get(token, "")
+
+    def _age_token(self, text: str) -> str:
+        """``5-6 years`` / ``12Y`` / ``0-3 mths`` → ``5-6`` / ``12`` / ``0-3``."""
+        compact = text.strip().lower().replace("–", "-")
+        unit_pattern = (
+            r"(?:months?|mths?|mth|m)"
+            if self.age_unit == "months"
+            else r"(?:years?|yrs?|yr|y)"
+        )
+        band = re.fullmatch(rf"(\d{{1,2}})\s*-\s*(\d{{1,2}})\s*{unit_pattern}", compact)
+        if band:
+            return _age_span(band.group(1), band.group(2))
+        single = re.fullmatch(rf"(\d{{1,2}})\s*{unit_pattern}", compact)
+        if single:
+            return _age_span(single.group(1), None)
+        bare = re.fullmatch(r"(\d{1,2})(?:\s*-\s*(\d{1,2}))?", compact)
+        if bare:
+            return _age_span(bare.group(1), bare.group(2))
+        raise ValueError(text)
+
+    def _age_text(self, token: str) -> str:
+        match = re.fullmatch(r"(\d{1,2})(?:-(\d{1,2}))?", token)
+        if match is None:
+            raise ValueError(token)
+        span = _age_span(match.group(1), match.group(2))
+        if self.age_unit == "months":
+            unit = "month" if span == "1" else "months"
+        else:
+            unit = "year" if span == "1" else "years"
+        return f"{span} {unit}"
+
+
+def _age_span(start: str, end: str | None) -> str:
+    return f"{int(start)}-{int(end)}" if end else str(int(start))
+
+
+def label_vocabulary(
+    *,
+    display: dict[str, str] | None = None,
+    aliases: dict[str, str] | None = None,
+    regional: dict[str, dict[Locale, str]] | None = None,
+    shorthand: dict[str, str] | None = None,
+    patterns: tuple[str, ...] = (),
+    age_unit: str = "",
+) -> LabelVocabulary:
+    """Build a vocabulary from dict literals and store the pairs as tuples."""
+    return LabelVocabulary(
+        display=tuple((display or {}).items()),
+        aliases=tuple((aliases or {}).items()),
+        regional=tuple(
+            (token, tuple(words.items())) for token, words in (regional or {}).items()
+        ),
+        shorthand=tuple((shorthand or {}).items()),
+        patterns=patterns,
+        age_unit=age_unit,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class FeedPattern:
+    """One recognition expression for a size unit.
+
+    ``explicit`` is a marked form such as ``UK 10`` or ``32"``. The bare-number
+    pattern is not explicit. ``marked`` is the leading W or L form (``W30``,
+    ``L32``).
+    """
+
+    expression: str
+    explicit: bool = True
+    marked: bool = False
+
+
+def _affinity(*families: ProductTypeFamily) -> frozenset[ProductType]:
+    """Product types whose feed strings may carry these families' size types."""
+    return frozenset(product for family in families for product in family.product_types)
+
+
+@dataclass(frozen=True, slots=True)
 class SizeType:
     """Fine-grained size category (dress, adult shoe, chest, …).
 
     Adult, kids, and baby shoes are separate size types. UK 7 adult is not UK 7 kids.
+    ``affinity`` names the product types a weakly marked value belongs with.
+    ``vocabulary`` owns the tokens for a label size type.
     """
 
     slug: str
@@ -458,6 +597,15 @@ class SizeType:
     # ``DEFAULT_LENGTH_MAX_INCHES`` (chest, waist, collar, inside leg).
     length_min_inches: Decimal | None = None
     length_max_inches: Decimal | None = None
+    # Product types for which a weakly marked value of this size type is plausible.
+    # Empty means recognition does not restrict by product type.
+    affinity: frozenset[ProductType] = frozenset()
+    # A bare number with no product type may still be this size type (dress, waist).
+    bare_without_product: bool = False
+    # Leading W or L on an inch value (``W30``, ``L32``).
+    feed_mark: str = ""
+    # Tokens, synonyms, and wording for ``SizeFamily.LABEL``.
+    vocabulary: LabelVocabulary | None = None
 
     @property
     def supports_brand_overrides(self) -> bool:
@@ -497,6 +645,62 @@ class SizeType:
             else DEFAULT_LENGTH_MAX_INCHES,
         )
 
+    def allows_bare_feed_value(self, product: ProductType | None) -> bool:
+        """Whether a bare number may be this size type for ``product``.
+
+        With no product type, only size types marked ``bare_without_product``
+        accept a bare number. With a product type, an empty affinity means the
+        size type is not restricted; otherwise the product has to be one this
+        size type names.
+        """
+        if product is None:
+            return self.bare_without_product
+        if not self.affinity:
+            return True
+        return product in self.affinity
+
+    def affinity_adjustment(self, product: ProductType | None) -> float:
+        """Confidence delta from whether ``product`` is one this size type names.
+
+        No product type, or an empty affinity, leaves the score unchanged. A
+        named product type adds 0.2. Any other product type subtracts 0.25.
+        """
+        if product is None or not self.affinity:
+            return 0.0
+        return 0.2 if product in self.affinity else -0.25
+
+    def feed_patterns(
+        self, *, locale: Locale, length_unit: str | None
+    ) -> tuple[FeedPattern, ...]:
+        """Recognition expressions for one unit of this size type."""
+        if self.family is SizeFamily.CUP_SIZE:
+            return tuple(FeedPattern(expression) for expression in _cup_recognition())
+        if self.family is SizeFamily.LENGTH:
+            return _length_recognition(self, length_unit or "")
+        if self.vocabulary is not None:
+            return tuple(
+                FeedPattern(expression) for expression in self.vocabulary.patterns
+            )
+        return _regional_number_patterns(locale)
+
+    def normalize_label(self, raw: object) -> str:
+        """Fold synonyms into the canonical token for this label size type."""
+        if self.vocabulary is None:
+            raise ValueError(f"{self.label} is not a label size type.")
+        try:
+            return self.vocabulary.canonical(raw)
+        except ValueError as exc:
+            raise ValueError(f"Unknown {self.label} value {raw!r}.") from exc
+
+    def label_text(self, token: str, locale: Locale | None = None) -> str:
+        """English label, or the regional word when ``locale`` has one."""
+        if self.vocabulary is None:
+            raise ValueError(f"{self.label} is not a label size type.")
+        try:
+            return self.vocabulary.text(token, locale)
+        except ValueError as exc:
+            raise ValueError(f"Unknown {self.label} token {token!r}.") from exc
+
     def __str__(self) -> str:
         return self.label
 
@@ -506,30 +710,36 @@ DRESS = SizeType(
     SizeFamily.DRESS_SIZE,
     "Dress size",
     ("dress-size",),
+    affinity=_affinity(ProductTypeFamily.DRESSES),
+    bare_without_product=True,
 )
 ADULT_SHOE = SizeType(
     SizeTypeSlug.ADULT_SHOE,
     SizeFamily.SHOE_SIZE,
     "Adult shoe size",
     ("adult-shoe-size", "shoe-size", "european-shoe-size"),
+    affinity=_affinity(ProductTypeFamily.FOOTWEAR),
 )
 KIDS_SHOE = SizeType(
     SizeTypeSlug.KIDS_SHOE,
     SizeFamily.SHOE_SIZE,
     "Kids shoe size",
     ("kids-shoe-size",),
+    affinity=_affinity(ProductTypeFamily.FOOTWEAR),
 )
 BABY_SHOE = SizeType(
     SizeTypeSlug.BABY_SHOE,
     SizeFamily.SHOE_SIZE,
     "Baby shoe size",
     ("baby-shoe-size",),
+    affinity=_affinity(ProductTypeFamily.FOOTWEAR),
 )
 CUP_SIZE = SizeType(
     SizeTypeSlug.CUP_SIZE,
     SizeFamily.CUP_SIZE,
     "Cup size",
     ("cup-size", "bra-cup", "bra-cup-size"),
+    affinity=frozenset({ProductType.BRAS}),
 )
 # Underbust band. Distinct from chest size (a jacket label) and from cup size.
 BAND_SIZE = SizeType(
@@ -538,6 +748,7 @@ BAND_SIZE = SizeType(
     "Band size",
     ("bra-band-size",),
     slug_stem="band-size",
+    affinity=frozenset({ProductType.BRAS}),
 )
 # Regional garment labels. Display uses the length formatter when the number is
 # an inch or centimetre measurement on every chart for that locale. UK, US, and
@@ -550,12 +761,14 @@ WAIST_SIZE = SizeType(
     SizeFamily.WAIST_SIZE,
     "Waist size",
     slug_stem="waist-size",
+    affinity=_affinity(ProductTypeFamily.BOTTOMS),
 )
 CHEST_SIZE = SizeType(
     SizeTypeSlug.CHEST_SIZE,
     SizeFamily.CHEST_SIZE,
     "Chest size",
     slug_stem="chest-size",
+    affinity=_affinity(ProductTypeFamily.TOPS),
 )
 # Body measurements (in/cm formula types). Bounds follow default chart spans,
 # children's school-uniform rows, and big-and-tall retail with headroom.
@@ -566,6 +779,7 @@ CHEST = SizeType(
     ("chest-size",),
     length_min_inches=Decimal("18"),
     length_max_inches=Decimal("88"),
+    affinity=_affinity(ProductTypeFamily.TOPS),
 )
 WAIST = SizeType(
     SizeTypeSlug.WAIST,
@@ -574,6 +788,9 @@ WAIST = SizeType(
     ("waist-size",),
     length_min_inches=Decimal("16"),
     length_max_inches=Decimal("85"),
+    affinity=_affinity(ProductTypeFamily.BOTTOMS),
+    bare_without_product=True,
+    feed_mark="W",
 )
 # Generic inseam / inside-leg when the catalog does not split shorts vs trousers.
 INSIDE_LEG = SizeType(
@@ -583,6 +800,8 @@ INSIDE_LEG = SizeType(
     ("inside-leg", "leg-length"),
     length_min_inches=Decimal("2"),
     length_max_inches=Decimal("42"),
+    affinity=_affinity(ProductTypeFamily.BOTTOMS),
+    feed_mark="L",
 )
 # Inseam bounds follow common retail spans (athletic/bermuda shorts through big &
 # tall long cargo ~18 in) with headroom to 22 in for long-short SKUs. Trousers
@@ -595,6 +814,8 @@ SHORTS_INSEAM = SizeType(
     ("shorts-inseam",),
     length_min_inches=Decimal("2"),
     length_max_inches=Decimal("22"),
+    affinity=frozenset({ProductType.SHORTS}),
+    feed_mark="L",
 )
 TROUSERS_INSEAM = SizeType(
     SizeTypeSlug.TROUSERS_INSEAM,
@@ -603,6 +824,8 @@ TROUSERS_INSEAM = SizeType(
     ("trousers-inseam",),
     length_min_inches=Decimal("24"),
     length_max_inches=Decimal("42"),
+    affinity=_affinity(ProductTypeFamily.BOTTOMS),
+    feed_mark="L",
 )
 COLLAR = SizeType(
     SizeTypeSlug.COLLAR,
@@ -611,6 +834,284 @@ COLLAR = SizeType(
     ("collar-size",),
     length_min_inches=Decimal("11"),
     length_max_inches=Decimal("28"),
+    affinity=frozenset({ProductType.SHIRTS, ProductType.DRESS_SHIRTS}),
+)
+# Dress-shirt sleeve: centre-back neck to wrist, the second number in ``15.5/34``.
+# Retail sleeves run about 30–38 in; the bounds leave room either side.
+SLEEVE = SizeType(
+    SizeTypeSlug.SLEEVE,
+    SizeFamily.LENGTH,
+    "Sleeve",
+    ("sleeve-length",),
+    length_min_inches=Decimal("28"),
+    length_max_inches=Decimal("40"),
+)
+# Sold-as words. ``raw`` is a canonical token (``regular``, ``extra-wide``).
+# They do not sit on locale charts. Each vocabulary owns the synonyms and
+# the regional wording.
+_LENGTH_WORDS = r"extra\s+short|extra\s+long|short|long|regular|standard"
+_LENGTH_DISPLAY = {
+    "extra-short": "Extra short",
+    "short": "Short",
+    "regular": "Regular",
+    "long": "Long",
+    "extra-long": "Extra long",
+}
+_LENGTH_REGIONAL = {
+    "extra-short": {Locale.FR: "Très court"},
+    "short": {Locale.FR: "Court"},
+    "regular": {Locale.FR: "Normal"},
+    "extra-long": {Locale.FR: "Très long"},
+}
+TROUSER_LENGTH_VOCABULARY = label_vocabulary(
+    display=_LENGTH_DISPLAY,
+    aliases={
+        "xs": "extra-short",
+        "xshort": "extra-short",
+        "extra short": "extra-short",
+        "extrashort": "extra-short",
+        "s": "short",
+        "short": "short",
+        "r": "regular",
+        "reg": "regular",
+        "regular": "regular",
+        "standard": "regular",
+        "std": "regular",
+        "l": "long",
+        "long": "long",
+        "xl": "extra-long",
+        "xlong": "extra-long",
+        "extra long": "extra-long",
+        "extralong": "extra-long",
+    },
+    regional=_LENGTH_REGIONAL,
+    shorthand={
+        "extra-short": "XS",
+        "short": "S",
+        "regular": "R",
+        "long": "L",
+        "extra-long": "XL",
+    },
+    patterns=(
+        rf"(?<![A-Za-z])(?P<value>{_LENGTH_WORDS})(?![A-Za-z])",
+        r"(?<=\d)\s*(?P<value>[SRL])(?![A-Za-z])",
+    ),
+)
+TOP_LENGTH_VOCABULARY = label_vocabulary(
+    display=_LENGTH_DISPLAY,
+    aliases={
+        "xs": "extra-short",
+        "extra short": "extra-short",
+        "short": "short",
+        "s": "short",
+        "regular": "regular",
+        "reg": "regular",
+        "standard": "regular",
+        "long": "long",
+        "l": "long",
+        "extra long": "extra-long",
+        "xl": "extra-long",
+    },
+    regional=_LENGTH_REGIONAL,
+    patterns=(rf"(?<![A-Za-z])(?P<value>{_LENGTH_WORDS})(?![A-Za-z])",),
+)
+SHOE_WIDTH_VOCABULARY = label_vocabulary(
+    display={
+        "narrow": "Narrow",
+        "standard": "Standard",
+        "wide": "Wide",
+        "extra-wide": "Extra wide",
+    },
+    aliases={
+        "narrow": "narrow",
+        "n": "narrow",
+        "d": "narrow",
+        "e": "narrow",
+        "standard": "standard",
+        "std": "standard",
+        "medium": "standard",
+        "med": "standard",
+        "f": "standard",
+        "wide": "wide",
+        "w": "wide",
+        "g": "wide",
+        "extra wide": "extra-wide",
+        "extra-wide": "extra-wide",
+        "extrawide": "extra-wide",
+        "xw": "extra-wide",
+        "h": "extra-wide",
+    },
+    regional={
+        "narrow": {Locale.FR: "Étroit"},
+        "standard": {Locale.US: "Medium"},
+        "wide": {Locale.FR: "Large"},
+        "extra-wide": {Locale.FR: "Très large"},
+    },
+    patterns=(
+        r"(?<![A-Za-z])(?P<value>extra\s*wide|wide|narrow|standard|medium)(?:\s+fit)?(?![A-Za-z])",
+        r"(?<![A-Za-z])(?P<value>[DEFGH])(?:\s*\([^)]*\))?(?![A-Za-z])",
+    ),
+)
+PROPORTION_VOCABULARY = label_vocabulary(
+    display={
+        "extra-tall": "Extra tall",
+        "tall": "Tall",
+        "regular": "Regular",
+        "petite": "Petite",
+        "short": "Short",
+        "long": "Long",
+    },
+    aliases={
+        "extra tall": "extra-tall",
+        "extra-tall": "extra-tall",
+        "xt": "extra-tall",
+        "tall": "tall",
+        "t": "tall",
+        "regular": "regular",
+        "reg": "regular",
+        "standard": "regular",
+        "petite": "petite",
+        "pet": "petite",
+        "pt": "petite",
+        "short": "short",
+        "long": "long",
+        "l": "long",
+    },
+    regional={
+        "extra-tall": {Locale.FR: "Très grand"},
+        "tall": {Locale.FR: "Grand"},
+    },
+    patterns=(r"(?<![A-Za-z])(?P<value>extra\s+tall|tall|petite|pt)(?![A-Za-z])",),
+)
+_LETTER_TOKEN = (
+    r"(?:one\s*size|os|xxx{0,4}s|xxx{0,3}l|[2-6]\s*x\s*l|"
+    r"extra\s*small|x{1,2}\s*-?\s*small|small|medium|large|"
+    r"extra\s*large|x{1,6}\s*-?\s*large|[2-6]\s*x\s*-?\s*large|"
+    r"xxs|xs|xl|xxl|[2-6]xl|s|m|l)"
+)
+LETTER_VOCABULARY = label_vocabulary(
+    display={
+        "XXS": "XXS",
+        "XS": "XS",
+        "S": "S",
+        "M": "M",
+        "L": "L",
+        "XL": "XL",
+        "2XL": "2XL",
+        "3XL": "3XL",
+        "4XL": "4XL",
+        "5XL": "5XL",
+        "6XL": "6XL",
+        "ONE": "One size",
+    },
+    aliases={
+        "xxs": "XXS",
+        "2xs": "XXS",
+        "xxsmall": "XXS",
+        "extra small": "XS",
+        "extrasmall": "XS",
+        "xsmall": "XS",
+        "x-small": "XS",
+        "x small": "XS",
+        "xs": "XS",
+        "small": "S",
+        "s": "S",
+        "medium": "M",
+        "med": "M",
+        "m": "M",
+        "large": "L",
+        "l": "L",
+        "extra large": "XL",
+        "extralarge": "XL",
+        "x-large": "XL",
+        "x large": "XL",
+        "xlarge": "XL",
+        "xl": "XL",
+        "xxl": "2XL",
+        "xxlarge": "2XL",
+        "2xl": "2XL",
+        "2x large": "2XL",
+        "xxxl": "3XL",
+        "3xl": "3XL",
+        "xxxxl": "4XL",
+        "4xl": "4XL",
+        "xxxxxl": "5XL",
+        "5xl": "5XL",
+        "xxxxxxl": "6XL",
+        "6xl": "6XL",
+        "one size": "ONE",
+        "onesize": "ONE",
+        "os": "ONE",
+    },
+    patterns=(rf"(?<![A-Za-z0-9])(?P<value>{_LETTER_TOKEN})(?![A-Za-z0-9])",),
+)
+AGE_MONTHS_VOCABULARY = label_vocabulary(
+    age_unit="months",
+    patterns=(
+        r"(?<!\d)(?P<value>\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:months?|mths?|mth|m))(?![A-Za-z])",
+    ),
+)
+AGE_YEARS_VOCABULARY = label_vocabulary(
+    age_unit="years",
+    patterns=(
+        r"(?<!\d)(?P<value>\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:years?|yrs?|yr|y))(?![A-Za-z])",
+    ),
+)
+TROUSER_LENGTH = SizeType(
+    SizeTypeSlug.TROUSER_LENGTH,
+    SizeFamily.LABEL,
+    "Trouser length",
+    ("trouser-length",),
+    affinity=_affinity(ProductTypeFamily.BOTTOMS),
+    vocabulary=TROUSER_LENGTH_VOCABULARY,
+)
+TOP_LENGTH = SizeType(
+    SizeTypeSlug.TOP_LENGTH,
+    SizeFamily.LABEL,
+    "Top length",
+    ("top-length",),
+    affinity=_affinity(ProductTypeFamily.TOPS),
+    vocabulary=TOP_LENGTH_VOCABULARY,
+)
+SHOE_WIDTH = SizeType(
+    SizeTypeSlug.SHOE_WIDTH,
+    SizeFamily.LABEL,
+    "Shoe width",
+    ("shoe-width", "shoe-fit"),
+    affinity=_affinity(ProductTypeFamily.FOOTWEAR),
+    vocabulary=SHOE_WIDTH_VOCABULARY,
+)
+PROPORTION = SizeType(
+    SizeTypeSlug.PROPORTION,
+    SizeFamily.LABEL,
+    "Proportion",
+    ("proportion",),
+    affinity=_affinity(ProductTypeFamily.DRESSES, ProductTypeFamily.TOPS),
+    vocabulary=PROPORTION_VOCABULARY,
+)
+AGE_MONTHS = SizeType(
+    SizeTypeSlug.AGE_MONTHS,
+    SizeFamily.LABEL,
+    "Age (months)",
+    ("age-months",),
+    vocabulary=AGE_MONTHS_VOCABULARY,
+)
+AGE_YEARS = SizeType(
+    SizeTypeSlug.AGE_YEARS,
+    SizeFamily.LABEL,
+    "Age (years)",
+    ("age-years",),
+    vocabulary=AGE_YEARS_VOCABULARY,
+)
+LETTER = SizeType(
+    SizeTypeSlug.LETTER,
+    SizeFamily.LABEL,
+    "Letter size",
+    ("letter-size", "generic-size"),
+    affinity=frozenset(
+        product for product in ProductType if product.takes_letter_size
+    ),
+    vocabulary=LETTER_VOCABULARY,
 )
 
 SIZE_TYPES: tuple[SizeType, ...] = (
@@ -628,6 +1129,14 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     SHORTS_INSEAM,
     TROUSERS_INSEAM,
     COLLAR,
+    SLEEVE,
+    TROUSER_LENGTH,
+    TOP_LENGTH,
+    SHOE_WIDTH,
+    PROPORTION,
+    AGE_MONTHS,
+    AGE_YEARS,
+    LETTER,
 )
 SIZE_TYPE_BY_SLUG: dict[str, SizeType] = {
     size_type.slug: size_type for size_type in SIZE_TYPES
@@ -712,9 +1221,7 @@ def length_value_in_range(
         )
     if not size_unit.length_unit:
         raise ValueError(f"{size_unit.label} is not a centimetre or inch size unit.")
-    inches = _inches_from_length_measurement(
-        raw, unit=size_unit.length_unit
-    )
+    inches = _inches_from_length_measurement(raw, unit=size_unit.length_unit)
     return length_in_inch_range(size_unit.size_type, inches)
 
 
@@ -772,6 +1279,10 @@ class SizeUnit:
     display_suffix: str = ""
     display_prefix: str = ""
     length_unit: str | None = None
+    # Expressions with a ``value`` group. Explicit forms are ``UK 10`` or
+    # ``32"``; the bare-number pattern is not explicit. Compiled only when
+    # ``recognition_patterns`` is called.
+    recognition: tuple[FeedPattern, ...] = ()
 
     @property
     def supports_brand_overrides(self) -> bool:
@@ -785,8 +1296,72 @@ class SizeUnit:
     def can_convert_to(self, other: SizeUnit) -> bool:
         return self.size_type.slug == other.size_type.slug
 
+    def recognition_is_fallback(self, pattern: re.Pattern[str]) -> bool:
+        """True when ``pattern`` is a non-explicit recognition entry."""
+        return any(
+            entry.expression == pattern.pattern and not entry.explicit
+            for entry in self.recognition
+        )
+
+    def recognition_patterns(self) -> tuple[re.Pattern[str], ...]:
+        """Compiled ``recognition`` patterns. Empty until a caller asks."""
+        if not self.recognition:
+            return ()
+        return tuple(
+            _compile_recognition(entry.expression) for entry in self.recognition
+        )
+
     def __str__(self) -> str:
         return self.label
+
+
+@lru_cache(maxsize=256)
+def _compile_recognition(pattern: str) -> re.Pattern[str]:
+    return re.compile(pattern, re.IGNORECASE)
+
+
+_NUMBER = r"\d{1,2}(?:\.\d)?"
+_BARE_NUMBER = rf"(?<!\d)(?P<value>{_NUMBER})(?!\d)"
+
+
+def _region_token(locale: Locale) -> str:
+    if locale is Locale.EU:
+        return r"EU(?:R)?"
+    return locale.value.upper()
+
+
+def _regional_number_patterns(locale: Locale) -> tuple[FeedPattern, ...]:
+    prefix = _region_token(locale)
+    return (
+        FeedPattern(
+            rf"(?<![A-Za-z]){prefix}\s*[-:]?\s*(?P<value>{_NUMBER})(?!\d)",
+        ),
+        FeedPattern(_BARE_NUMBER, explicit=False),
+    )
+
+
+def _cup_recognition() -> tuple[str, ...]:
+    letters = "|".join(sorted(CUP_TOKENS, key=len, reverse=True))
+    return (rf"(?<![A-Za-z])(?P<value>{letters})(?![A-Za-z])",)
+
+
+def _length_recognition(size_type: SizeType, unit: str) -> tuple[FeedPattern, ...]:
+    inch_suffix = r'(?:"|″|in\b|inch(?:es)?)'
+    if unit == "in":
+        suffixed = rf"(?<!\d)(?P<value>{_NUMBER})\s*{inch_suffix}"
+    else:
+        suffixed = r"(?<!\d)(?P<value>\d{1,3}(?:\.\d)?)\s*cm\b"
+    patterns = [FeedPattern(suffixed)]
+    if unit == "in" and size_type.feed_mark:
+        patterns.insert(
+            0,
+            FeedPattern(
+                rf"(?<![A-Za-z]){size_type.feed_mark}\s*(?P<value>{_NUMBER})(?:\s*{inch_suffix})?",
+                marked=True,
+            ),
+        )
+    patterns.append(FeedPattern(_BARE_NUMBER, explicit=False))
+    return tuple(patterns)
 
 
 def _locale_size_unit(
@@ -820,6 +1395,7 @@ def _locale_size_unit(
         display_prefix=prefix,
         display_suffix=suffix,
         length_unit=measurement,
+        recognition=size_type.feed_patterns(locale=locale, length_unit=measurement),
     )
 
 
@@ -834,6 +1410,9 @@ def _length_size_unit(
         label=f"{size_type.label} ({label_unit})",
         display_suffix=display_suffix,
         length_unit=unit,
+        recognition=size_type.feed_patterns(
+            locale=Locale.UNIVERSAL, length_unit=unit
+        ),
     )
 
 
@@ -928,6 +1507,43 @@ INCH_COLLAR_SIZE = _length_size_unit(
 CM_COLLAR_SIZE = _length_size_unit(
     COLLAR, unit="cm", display_suffix="cm", label_unit="centimetres"
 )
+INCH_SLEEVE_SIZE = _length_size_unit(
+    SLEEVE, unit="in", display_suffix='"', label_unit="inches"
+)
+CM_SLEEVE_SIZE = _length_size_unit(
+    SLEEVE, unit="cm", display_suffix="cm", label_unit="centimetres"
+)
+
+
+def _label_size_unit(size_type: SizeType) -> SizeUnit:
+    return SizeUnit(
+        slug=size_type.slug,
+        size_type=size_type,
+        locale=Locale.UNIVERSAL,
+        label=size_type.label,
+        recognition=size_type.feed_patterns(
+            locale=Locale.UNIVERSAL, length_unit=None
+        ),
+    )
+
+
+TROUSER_LENGTH_SIZE = _label_size_unit(TROUSER_LENGTH)
+TOP_LENGTH_SIZE = _label_size_unit(TOP_LENGTH)
+SHOE_WIDTH_SIZE = _label_size_unit(SHOE_WIDTH)
+PROPORTION_SIZE = _label_size_unit(PROPORTION)
+AGE_MONTHS_SIZE = _label_size_unit(AGE_MONTHS)
+AGE_YEARS_SIZE = _label_size_unit(AGE_YEARS)
+LETTER_SIZE = _label_size_unit(LETTER)
+
+def label_display(size_type: SizeType, token: str) -> str:
+    """English label for a canonical label-size token, including age bands."""
+    return size_type.label_text(token)
+
+
+def normalize_label_token(size_type: SizeType, raw: object) -> str:
+    """Fold synonyms into the canonical token for a label size type."""
+    return size_type.normalize_label(raw)
+
 
 SIZE_UNITS: tuple[SizeUnit, ...] = (
     UK_DRESS_SIZE,
@@ -975,6 +1591,15 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     CM_TROUSERS_INSEAM,
     INCH_COLLAR_SIZE,
     CM_COLLAR_SIZE,
+    INCH_SLEEVE_SIZE,
+    CM_SLEEVE_SIZE,
+    TROUSER_LENGTH_SIZE,
+    TOP_LENGTH_SIZE,
+    SHOE_WIDTH_SIZE,
+    PROPORTION_SIZE,
+    AGE_MONTHS_SIZE,
+    AGE_YEARS_SIZE,
+    LETTER_SIZE,
 )
 SIZE_UNIT_BY_SLUG: dict[str, SizeUnit] = {
     size_unit.slug: size_unit for size_unit in SIZE_UNITS
@@ -1163,6 +1788,11 @@ def size_from_attribute_option(
             if not length_value_in_range(raw, size_unit):
                 return None
             return Size(raw=raw, size_unit=size_unit)
+        if size_unit.size_type.family == SizeFamily.LABEL:
+            return Size(
+                raw=normalize_label_token(size_unit.size_type, text),
+                size_unit=size_unit,
+            )
         return Size(raw=normalize_raw(text), size_unit=size_unit)
     except (InvalidOperation, ValueError, TypeError):
         return None
@@ -1353,6 +1983,12 @@ class Size:
                 object.__setattr__(self, "raw", normalize_raw(self.raw))
         elif self.size_unit.size_type.family == SizeFamily.LENGTH:
             object.__setattr__(self, "raw", normalize_length_raw(self.raw))
+        elif self.size_unit.size_type.family == SizeFamily.LABEL:
+            object.__setattr__(
+                self,
+                "raw",
+                normalize_label_token(self.size_unit.size_type, self.raw),
+            )
         else:
             object.__setattr__(self, "raw", normalize_raw(self.raw))
 
@@ -1382,14 +2018,17 @@ class Size:
         ``raw`` stays ``MD`` / ``LG``. Persist ``raw``: parsing ``M`` or ``L``
         reads them as cup letters.
         """
+        if self.size_unit.size_type.family == SizeFamily.LABEL and isinstance(
+            self.raw, str
+        ):
+            return label_display(self.size_unit.size_type, self.raw)
         if self.size_unit.length_unit and isinstance(self.raw, Decimal):
             return format_length_for_language(
                 self.raw, self.size_unit.length_unit, locale
             )
         token = self.raw if isinstance(self.raw, str) else format_raw(self.raw)
-        if (
-            self.size_unit.size_type.family == SizeFamily.CUP_SIZE
-            and isinstance(self.raw, str)
+        if self.size_unit.size_type.family == SizeFamily.CUP_SIZE and isinstance(
+            self.raw, str
         ):
             token = format_cup_display(self.raw)
         if self.size_unit.display_prefix:
