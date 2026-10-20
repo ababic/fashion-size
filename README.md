@@ -65,7 +65,9 @@ encode_size_description(
 ).text
 ```
 
-`confidence` drops when another format was also plausible. `discarded` lists tokens that were duplicates, ranges, or not recognised. A range such as `UK 8-10` is not a size. A cell with several regions, such as `EU 38 / UK 10` or `41 (UK 7.5)`, returns each region. `preferred_regions` then keeps the first of those that is present. Omit it and `source_region` is used. Chart sizes are not converted onto a chart.
+`confidence` drops when another format was also plausible. `discarded` lists tokens that were duplicates, ranges, out of the target length range, or not recognised. A range such as `UK 8-10` is not a size. A cell with several regions, such as `EU 38 / UK 10` or `41 (UK 7.5)`, returns each region. `preferred_regions` then keeps the first of those that is present. Omit it and `source_region` is used. Chart sizes are not converted onto a chart. A length that cannot be converted into the preferred unit is discarded with reason `out-of-range`.
+
+A bra string such as `32DD` is a UK inch band from 28 to 56 plus a cup letter, in whichever region the cell was written. A French prefix is folded onto EU before an unlabelled number in the adult shoe span (35–50) is read as a shoe size. A lone `FR 40` stays a French band size, because that explicit label scores higher. In a multi-region cell such as `FR 40 / UK 6`, the French number is an EU adult shoe size.
 
 ## Brand charts
 

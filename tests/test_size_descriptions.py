@@ -1,5 +1,7 @@
 """Feed size strings: decode into sizes, encode back to text."""
 
+import re
+
 import pytest
 
 from fashion_size.descriptions import decode_size_description, encode_size_description
@@ -7,6 +9,7 @@ from fashion_size.product_types import ProductType
 from fashion_size.types import (
     AGE_MONTHS_SIZE,
     AGE_YEARS_SIZE,
+    CM_TROUSERS_INSEAM,
     CM_WAIST_SIZE,
     DRESS,
     EU_ADULT_SHOE_SIZE,
@@ -20,6 +23,8 @@ from fashion_size.types import (
     LETTER_SIZE,
     PROPORTION_SIZE,
     SHOE_WIDTH_SIZE,
+    SIZE_TYPES,
+    SIZE_UNITS,
     TOP_LENGTH_SIZE,
     TROUSER_LENGTH_SIZE,
     UK_ADULT_SHOE_SIZE,
@@ -672,6 +677,9 @@ def test_size_types_own_the_product_types_they_belong_with():
     assert WAIST.feed_mark == "W"
     assert LETTER.vocabulary is not None
     assert LETTER.vocabulary.canonical("small") == "S"
+    assert LETTER.affinity == frozenset(
+        product for product in ProductType if product.takes_letter_size
+    )
     assert ProductType.BRAS not in LETTER.affinity
 
 
@@ -690,6 +698,117 @@ def test_shoe_width_wording_follows_the_region():
         product_type=ProductType.SHOES,
     )
     assert french.text == "Large"
+
+
+def test_every_size_type_and_unit_is_hashable():
+    assert len(set(SIZE_TYPES)) == len(SIZE_TYPES)
+    assert len(set(SIZE_UNITS)) == len(SIZE_UNITS)
+    assert hash(Size("regular", TROUSER_LENGTH_SIZE))
+    assert hash(Size("L", LETTER_SIZE))
+
+
+def test_word_like_aliases_match_a_recognition_pattern():
+    """Feed words are recognised. Compact codes stay ``Size()``-only.
+
+    A single letter, a digit code such as ``2xl``, a run of x's such as
+    ``xxxxxxl``, and short forms such as ``xs``, ``reg``, ``std``,
+    ``xshort``, and ``extrashort`` do not have to appear in a recognition
+    pattern. A bare ``R`` is a trouser length only after a digit. Words such
+    as ``extra short``, ``regular``, and ``extra wide`` do.
+    """
+    compact = frozenset(
+        {
+            "xs",
+            "xl",
+            "reg",
+            "std",
+            "xshort",
+            "extrashort",
+            "xlong",
+            "extralong",
+            "pt",
+            "xt",
+            "os",
+            "med",
+            "xw",
+            "pet",
+        }
+    )
+    patterns = [
+        pattern for unit in SIZE_UNITS for pattern in unit.recognition_patterns()
+    ]
+    checked = 0
+    for unit in SIZE_UNITS:
+        vocabulary = unit.size_type.vocabulary
+        if vocabulary is None:
+            continue
+        for alias, _token in vocabulary.aliases:
+            if len(alias) <= 1 or alias in compact or re.fullmatch(r"x+[sl]", alias):
+                continue
+            if any(char.isdigit() for char in alias) and " " not in alias:
+                continue
+            assert any(pattern.search(alias) for pattern in patterns), alias
+            checked += 1
+    assert checked
+
+
+def test_bare_length_code_is_not_a_length_word():
+    bare = decode_size_description("R", Locale.UK, product_type=ProductType.TROUSERS)
+    assert bare.format_id != "length-word"
+    assert Size("R", TROUSER_LENGTH_SIZE).raw == "regular"
+    word = decode_size_description(
+        "Regular", Locale.UK, product_type=ProductType.TROUSERS
+    )
+    assert word.sizes[0].size_unit is TROUSER_LENGTH_SIZE
+    assert word.sizes[0].raw == "regular"
+    assert "length-word" in word.alternatives
+
+
+def test_french_prefix_folds_before_the_shoe_guess():
+    """FR is folded onto EU before the 35–50 shoe guess.
+
+    A lone ``FR 40`` is still a French band: that explicit label scores higher
+    than the shoe guess. The same fold is what a multi-region cell uses, so
+    ``FR 40 / UK 6`` reads 40 as an EU adult shoe.
+    """
+    lone = decode_size_description("FR 40", Locale.UK)
+    assert lone.sizes[0].size_unit.slug == "fr-band-size"
+    assert lone.sizes[0].raw == 40
+    assert "regional-number" in lone.alternatives
+
+    paired = decode_size_description("FR 40 / UK 6", Locale.UK)
+    assert paired.sizes[0].size_unit is EU_ADULT_SHOE_SIZE
+    assert paired.sizes[0].raw == 40
+
+
+def test_bra_band_stays_a_uk_inch_band():
+    decoded = decode_size_description(
+        "32DD", Locale.FR, product_type=ProductType.BRAS
+    )
+    assert [size.size_unit for size in decoded.sizes] == [UK_BAND_SIZE, UK_CUP_SIZE]
+
+
+def test_encode_discards_a_length_outside_the_target_range():
+    encoded = encode_size_description(
+        [Size(30, CM_WAIST_SIZE)],
+        Locale.UK,
+        preferred_regions=(Locale.UK,),
+        product_type=ProductType.JEANS,
+    )
+    assert encoded.text == ""
+    assert encoded.used == ()
+    assert [item.reason for item in encoded.discarded] == ["out-of-range"]
+
+    pair = encode_size_description(
+        [Size(30, CM_WAIST_SIZE), Size(81, CM_TROUSERS_INSEAM)],
+        Locale.EU,
+        preferred_regions=(Locale.EU,),
+        format="waist-leg",
+    )
+    assert pair.text == ""
+    reasons = [item.reason for item in pair.discarded]
+    assert reasons.count("out-of-range") == 1
+    assert reasons.count("unused") == 1
 
 
 def test_jeans_slash_round_trips():

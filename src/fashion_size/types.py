@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
@@ -446,18 +446,19 @@ class LengthRange:
 class LabelVocabulary:
     """Tokens, synonyms, and wording for a label size type.
 
-    ``display`` maps a canonical token to English. ``aliases`` maps a folded
-    synonym (case and hyphens folded) onto that token. ``regional`` replaces
-    the English word for one locale. ``shorthand`` is the short letter used in
-    a compound such as ``30L``. ``patterns`` are recognition expressions, each
-    with a ``value`` group. ``age_unit`` is ``months`` or ``years`` when the
-    token is an age band rather than a word.
+    Pairs are stored as tuples so a frozen size type that owns a vocabulary
+    can be hashed. ``display`` maps a canonical token to English. ``aliases``
+    maps a folded synonym (case and hyphens folded) onto that token.
+    ``regional`` replaces the English word for one locale. ``shorthand`` is
+    the short letter used in a compound such as ``30L``. ``patterns`` are
+    recognition expressions, each with a ``value`` group. ``age_unit`` is
+    ``months`` or ``years`` when the token is an age band rather than a word.
     """
 
-    display: dict[str, str] = field(default_factory=dict)
-    aliases: dict[str, str] = field(default_factory=dict)
-    regional: dict[str, dict[Locale, str]] = field(default_factory=dict)
-    shorthand: dict[str, str] = field(default_factory=dict)
+    display: tuple[tuple[str, str], ...] = ()
+    aliases: tuple[tuple[str, str], ...] = ()
+    regional: tuple[tuple[str, tuple[tuple[Locale, str], ...]], ...] = ()
+    shorthand: tuple[tuple[str, str], ...] = ()
     patterns: tuple[str, ...] = ()
     age_unit: str = ""
 
@@ -467,10 +468,11 @@ class LabelVocabulary:
             return self._age_token(str(raw))
         text = str(raw).strip()
         key = " ".join(text.replace("-", " ").casefold().split())
-        if key in self.aliases:
-            return self.aliases[key]
+        aliases = dict(self.aliases)
+        if key in aliases:
+            return aliases[key]
         token = key.replace(" ", "-")
-        if token in self.display:
+        if token in dict(self.display):
             return token
         raise ValueError(raw)
 
@@ -479,13 +481,23 @@ class LabelVocabulary:
         if self.age_unit:
             return self._age_text(token)
         if locale is not None:
-            translated = self.regional.get(token, {}).get(locale)
+            translated = dict(self.regional_words(token)).get(locale)
             if translated is not None:
                 return translated
         try:
-            return self.display[token]
+            return dict(self.display)[token]
         except KeyError as exc:
             raise ValueError(token) from exc
+
+    def regional_words(self, token: str) -> tuple[tuple[Locale, str], ...]:
+        for name, words in self.regional:
+            if name == token:
+                return words
+        return ()
+
+    def shorthand_for(self, token: str) -> str:
+        """Short letter for a compound such as ``30L``, or ``""``."""
+        return dict(self.shorthand).get(token, "")
 
     def _age_token(self, text: str) -> str:
         """``5-6 years`` / ``12Y`` / ``0-3 mths`` → ``5-6`` / ``12`` / ``0-3``."""
@@ -520,6 +532,42 @@ class LabelVocabulary:
 
 def _age_span(start: str, end: str | None) -> str:
     return f"{int(start)}-{int(end)}" if end else str(int(start))
+
+
+def label_vocabulary(
+    *,
+    display: dict[str, str] | None = None,
+    aliases: dict[str, str] | None = None,
+    regional: dict[str, dict[Locale, str]] | None = None,
+    shorthand: dict[str, str] | None = None,
+    patterns: tuple[str, ...] = (),
+    age_unit: str = "",
+) -> LabelVocabulary:
+    """Build a vocabulary from dict literals and store the pairs as tuples."""
+    return LabelVocabulary(
+        display=tuple((display or {}).items()),
+        aliases=tuple((aliases or {}).items()),
+        regional=tuple(
+            (token, tuple(words.items())) for token, words in (regional or {}).items()
+        ),
+        shorthand=tuple((shorthand or {}).items()),
+        patterns=patterns,
+        age_unit=age_unit,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class FeedPattern:
+    """One recognition expression for a size unit.
+
+    ``explicit`` is a marked form such as ``UK 10`` or ``32"``. The bare-number
+    pattern is not explicit. ``marked`` is the leading W or L form (``W30``,
+    ``L32``).
+    """
+
+    expression: str
+    explicit: bool = True
+    marked: bool = False
 
 
 def _affinity(*families: ProductTypeFamily) -> frozenset[ProductType]:
@@ -611,31 +659,28 @@ class SizeType:
             return True
         return product in self.affinity
 
-    def feed_score_adjustment(self, raw: object, product: ProductType | None) -> float:
-        """Confidence delta once a recognition pattern has built a size."""
-        adjustment = 0.0
-        if product is not None and self.affinity:
-            adjustment += 0.2 if product in self.affinity else -0.25
-        if (
-            self.family is SizeFamily.CUP_SIZE
-            and raw in {"S", "M", "L"}
-            and product is not ProductType.BRAS
-        ):
-            adjustment -= 0.45
-        if self.slug == "letter" and product is ProductType.BRAS:
-            adjustment -= 0.45
-        return adjustment
+    def affinity_adjustment(self, product: ProductType | None) -> float:
+        """Confidence delta from whether ``product`` is one this size type names.
+
+        No product type, or an empty affinity, leaves the score unchanged. A
+        named product type adds 0.2. Any other product type subtracts 0.25.
+        """
+        if product is None or not self.affinity:
+            return 0.0
+        return 0.2 if product in self.affinity else -0.25
 
     def feed_patterns(
         self, *, locale: Locale, length_unit: str | None
-    ) -> tuple[str, ...]:
+    ) -> tuple[FeedPattern, ...]:
         """Recognition expressions for one unit of this size type."""
         if self.family is SizeFamily.CUP_SIZE:
-            return _cup_recognition()
+            return tuple(FeedPattern(expression) for expression in _cup_recognition())
         if self.family is SizeFamily.LENGTH:
             return _length_recognition(self, length_unit or "")
         if self.vocabulary is not None:
-            return self.vocabulary.patterns
+            return tuple(
+                FeedPattern(expression) for expression in self.vocabulary.patterns
+            )
         return _regional_number_patterns(locale)
 
     def normalize_label(self, raw: object) -> str:
@@ -818,7 +863,7 @@ _LENGTH_REGIONAL = {
     "regular": {Locale.FR: "Normal"},
     "extra-long": {Locale.FR: "Très long"},
 }
-TROUSER_LENGTH_VOCABULARY = LabelVocabulary(
+TROUSER_LENGTH_VOCABULARY = label_vocabulary(
     display=_LENGTH_DISPLAY,
     aliases={
         "xs": "extra-short",
@@ -852,7 +897,7 @@ TROUSER_LENGTH_VOCABULARY = LabelVocabulary(
         r"(?<=\d)\s*(?P<value>[SRL])(?![A-Za-z])",
     ),
 )
-TOP_LENGTH_VOCABULARY = LabelVocabulary(
+TOP_LENGTH_VOCABULARY = label_vocabulary(
     display=_LENGTH_DISPLAY,
     aliases={
         "xs": "extra-short",
@@ -870,7 +915,7 @@ TOP_LENGTH_VOCABULARY = LabelVocabulary(
     regional=_LENGTH_REGIONAL,
     patterns=(rf"(?<![A-Za-z])(?P<value>{_LENGTH_WORDS})(?![A-Za-z])",),
 )
-SHOE_WIDTH_VOCABULARY = LabelVocabulary(
+SHOE_WIDTH_VOCABULARY = label_vocabulary(
     display={
         "narrow": "Narrow",
         "standard": "Standard",
@@ -907,7 +952,7 @@ SHOE_WIDTH_VOCABULARY = LabelVocabulary(
         r"(?<![A-Za-z])(?P<value>[DEFGH])(?:\s*\([^)]*\))?(?![A-Za-z])",
     ),
 )
-PROPORTION_VOCABULARY = LabelVocabulary(
+PROPORTION_VOCABULARY = label_vocabulary(
     display={
         "extra-tall": "Extra tall",
         "tall": "Tall",
@@ -944,7 +989,7 @@ _LETTER_TOKEN = (
     r"extra\s*large|x{1,6}\s*-?\s*large|[2-6]\s*x\s*-?\s*large|"
     r"xxs|xs|xl|xxl|[2-6]xl|s|m|l)"
 )
-LETTER_VOCABULARY = LabelVocabulary(
+LETTER_VOCABULARY = label_vocabulary(
     display={
         "XXS": "XXS",
         "XS": "XS",
@@ -1000,24 +1045,18 @@ LETTER_VOCABULARY = LabelVocabulary(
     },
     patterns=(rf"(?<![A-Za-z0-9])(?P<value>{_LETTER_TOKEN})(?![A-Za-z0-9])",),
 )
-AGE_MONTHS_VOCABULARY = LabelVocabulary(
+AGE_MONTHS_VOCABULARY = label_vocabulary(
     age_unit="months",
     patterns=(
         r"(?<!\d)(?P<value>\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:months?|mths?|mth|m))(?![A-Za-z])",
     ),
 )
-AGE_YEARS_VOCABULARY = LabelVocabulary(
+AGE_YEARS_VOCABULARY = label_vocabulary(
     age_unit="years",
     patterns=(
         r"(?<!\d)(?P<value>\d{1,2}(?:\s*-\s*\d{1,2})?\s*(?:years?|yrs?|yr|y))(?![A-Za-z])",
     ),
 )
-_LETTER_PRODUCTS = _affinity(
-    ProductTypeFamily.DRESSES,
-    ProductTypeFamily.TOPS,
-    ProductTypeFamily.BOTTOMS,
-) | frozenset({ProductType.UNDERWEAR, ProductType.HOSIERY})
-
 TROUSER_LENGTH = SizeType(
     SizeTypeSlug.TROUSER_LENGTH,
     SizeFamily.LABEL,
@@ -1069,7 +1108,9 @@ LETTER = SizeType(
     SizeFamily.LABEL,
     "Letter size",
     ("letter-size", "generic-size"),
-    affinity=_LETTER_PRODUCTS,
+    affinity=frozenset(
+        product for product in ProductType if product.takes_letter_size
+    ),
     vocabulary=LETTER_VOCABULARY,
 )
 
@@ -1238,10 +1279,10 @@ class SizeUnit:
     display_suffix: str = ""
     display_prefix: str = ""
     length_unit: str | None = None
-    # Regex strings with a ``value`` group. The first pattern is the explicit
-    # form (``UK 10``, ``32"``). Later patterns are weaker (a bare number).
-    # Compiled only when ``recognition_patterns`` is called.
-    recognition: tuple[str, ...] = ()
+    # Expressions with a ``value`` group. Explicit forms are ``UK 10`` or
+    # ``32"``; the bare-number pattern is not explicit. Compiled only when
+    # ``recognition_patterns`` is called.
+    recognition: tuple[FeedPattern, ...] = ()
 
     @property
     def supports_brand_overrides(self) -> bool:
@@ -1256,14 +1297,19 @@ class SizeUnit:
         return self.size_type.slug == other.size_type.slug
 
     def recognition_is_fallback(self, pattern: re.Pattern[str]) -> bool:
-        """True for the bare-number pattern, which needs region and product context."""
-        return pattern.pattern == _BARE_NUMBER
+        """True when ``pattern`` is a non-explicit recognition entry."""
+        return any(
+            entry.expression == pattern.pattern and not entry.explicit
+            for entry in self.recognition
+        )
 
     def recognition_patterns(self) -> tuple[re.Pattern[str], ...]:
         """Compiled ``recognition`` patterns. Empty until a caller asks."""
         if not self.recognition:
             return ()
-        return tuple(_compile_recognition(pattern) for pattern in self.recognition)
+        return tuple(
+            _compile_recognition(entry.expression) for entry in self.recognition
+        )
 
     def __str__(self) -> str:
         return self.label
@@ -1284,11 +1330,13 @@ def _region_token(locale: Locale) -> str:
     return locale.value.upper()
 
 
-def _regional_number_patterns(locale: Locale) -> tuple[str, ...]:
+def _regional_number_patterns(locale: Locale) -> tuple[FeedPattern, ...]:
     prefix = _region_token(locale)
     return (
-        rf"(?<![A-Za-z]){prefix}\s*[-:]?\s*(?P<value>{_NUMBER})(?!\d)",
-        _BARE_NUMBER,
+        FeedPattern(
+            rf"(?<![A-Za-z]){prefix}\s*[-:]?\s*(?P<value>{_NUMBER})(?!\d)",
+        ),
+        FeedPattern(_BARE_NUMBER, explicit=False),
     )
 
 
@@ -1297,19 +1345,22 @@ def _cup_recognition() -> tuple[str, ...]:
     return (rf"(?<![A-Za-z])(?P<value>{letters})(?![A-Za-z])",)
 
 
-def _length_recognition(size_type: SizeType, unit: str) -> tuple[str, ...]:
+def _length_recognition(size_type: SizeType, unit: str) -> tuple[FeedPattern, ...]:
     inch_suffix = r'(?:"|″|in\b|inch(?:es)?)'
     if unit == "in":
         suffixed = rf"(?<!\d)(?P<value>{_NUMBER})\s*{inch_suffix}"
     else:
         suffixed = r"(?<!\d)(?P<value>\d{1,3}(?:\.\d)?)\s*cm\b"
-    patterns = [suffixed]
+    patterns = [FeedPattern(suffixed)]
     if unit == "in" and size_type.feed_mark:
         patterns.insert(
             0,
-            rf"(?<![A-Za-z]){size_type.feed_mark}\s*(?P<value>{_NUMBER})(?:\s*{inch_suffix})?",
+            FeedPattern(
+                rf"(?<![A-Za-z]){size_type.feed_mark}\s*(?P<value>{_NUMBER})(?:\s*{inch_suffix})?",
+                marked=True,
+            ),
         )
-    patterns.append(_BARE_NUMBER)
+    patterns.append(FeedPattern(_BARE_NUMBER, explicit=False))
     return tuple(patterns)
 
 

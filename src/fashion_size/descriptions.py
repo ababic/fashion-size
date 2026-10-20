@@ -17,30 +17,42 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from enum import StrEnum
 
 from fashion_size.demographics import AgeGroup, Demographic, Gender
 from fashion_size.product_types import ProductType, ProductTypeFamily
 from fashion_size.types import (
     ADULT_SHOE,
+    AGE_MONTHS,
     AGE_MONTHS_SIZE,
+    AGE_YEARS,
     AGE_YEARS_SIZE,
+    BAND_SIZE,
     CHEST_SIZE,
     CM_COLLAR_SIZE,
     CM_WAIST_SIZE,
+    CUP_SIZE,
     CUP_TOKENS,
     DRESS,
     INCH_COLLAR_SIZE,
     INCH_SLEEVE_SIZE,
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
+    LETTER,
+    PROPORTION,
     PROPORTION_SIZE,
+    SHOE_WIDTH,
     SHOE_WIDTH_SIZE,
     SIZE_UNITS,
     TOP_LENGTH_SIZE,
+    TROUSER_LENGTH,
     TROUSER_LENGTH_SIZE,
+    TROUSERS_INSEAM,
     UK_BAND_SIZE,
     UK_CUP_SIZE,
+    WAIST,
     WAIST_SIZE,
+    LengthOutOfRangeError,
     Locale,
     Size,
     SizeFamily,
@@ -57,6 +69,16 @@ from fashion_size.types import (
 _REGION_PREFIX = r"(?:UK|EU|EUR|US|AU|FR)"
 _NUM = r"\d{1,2}(?:\.\d)?"
 _UNLABELLED_EU_SHOE = (35, 50)
+# Shared unit-pattern scores. A marked W/L span adds the width term on top.
+_EXPLICIT_SCORE = 0.82
+_BARE_SCORE = 0.48
+_LOCALE_BONUS = 0.05
+_MARKED_BONUS = 0.12
+_MARKED_SPAN_BONUS = 0.05
+_AMBIGUITY_PENALTY = 0.45
+# Feed conventions, tighter than the size type's own inch range.
+_FEED_WAIST_INCHES = (24, 50)
+_UK_BRA_BAND_INCHES = (28, 56)
 
 # Context that looks like a size token but is a quantity, a year, a collection
 # name, or a garment phrase. A recognition match inside one of these is not a size.
@@ -90,22 +112,62 @@ _FIT_WORDS = {
     "tall": "tall",
     "extra tall": "extra-tall",
 }
-_LENGTH_WORDS = frozenset(
-    {
-        "extra short",
-        "short",
-        "regular",
-        "standard",
-        "long",
-        "extra long",
-    }
+
+
+class SizeDescriptionFormat(StrEnum):
+    """Format ids returned by decode and encode. Values are the public strings."""
+
+    REGIONS = "regions"
+    NUMBERED_FIT = "numbered-fit"
+    COLLAR_SLEEVE = "collar-sleeve"
+    UNIT_PATTERNS = "unit-patterns"
+    AGE = "age"
+    WAIST_LEG = "waist-leg"
+    WAIST_LENGTH = "waist-length"
+    BRA = "bra"
+    SHOE_WIDTH = "shoe-width"
+    PROPORTION = "proportion"
+    LENGTH_WORD = "length-word"
+    REGIONAL_NUMBER = "regional-number"
+    BARE_NUMBER = "bare-number"
+    SHOE = "shoe"
+    PIECES = "pieces"
+
+
+@dataclass(frozen=True, slots=True)
+class _CrossTypePenalty:
+    """Score subtracted when one size type is easily read as another.
+
+    ``when_matches`` selects the product type named in ``product``. When it is
+    false, every other product type is penalised, including no product type.
+    An empty ``raw`` set applies to every value.
+    """
+
+    size_type: SizeType
+    product: ProductType
+    when_matches: bool
+    raw: frozenset[object]
+    penalty: float
+
+
+# Cup S/M/L is a letter size unless the product is a bra. A letter size on a
+# bra is a cup. These sit next to the reader because they compare two size types.
+_CROSS_TYPE_PENALTIES = (
+    _CrossTypePenalty(
+        CUP_SIZE,
+        ProductType.BRAS,
+        False,
+        frozenset({"S", "M", "L"}),
+        _AMBIGUITY_PENALTY,
+    ),
+    _CrossTypePenalty(
+        LETTER,
+        ProductType.BRAS,
+        True,
+        frozenset(),
+        _AMBIGUITY_PENALTY,
+    ),
 )
-_PROPORTION_WORDS = {
-    "extra tall": "extra-tall",
-    "tall": "tall",
-    "petite": "petite",
-    "pt": "petite",
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,8 +208,37 @@ class _Hit:
     discarded: tuple[DiscardedToken, ...] = ()
 
 
-def _in_span(value: Decimal, low: int, high: int) -> bool:
+def _in_span(value: Decimal, low: int | Decimal, high: int | Decimal) -> bool:
     return Decimal(low) <= value <= Decimal(high)
+
+
+def _cross_type_penalty(
+    size_type: SizeType, raw: object, product: ProductType | None
+) -> float:
+    penalty = 0.0
+    for rule in _CROSS_TYPE_PENALTIES:
+        if size_type is not rule.size_type:
+            continue
+        if (product is rule.product) is not rule.when_matches:
+            continue
+        if rule.raw and raw not in rule.raw:
+            continue
+        penalty -= rule.penalty
+    return penalty
+
+
+def _explicit_word(text: str, unit: SizeUnit) -> bool:
+    """Whether ``text`` is one whole explicit recognition, not a short code.
+
+    A bare ``R`` is a trouser-length token only after a digit, so the letter
+    pattern does not match the cell on its own. ``Regular`` does.
+    """
+    return any(
+        entry.explicit
+        and not entry.marked
+        and re.fullmatch(entry.expression, text, flags=re.IGNORECASE)
+        for entry in unit.recognition
+    )
 
 
 def _number(text: str) -> Decimal:
@@ -231,14 +322,14 @@ class SizeDescription:
         incoming = tuple(values)
         chosen, discarded = self._choose_values(incoming, order, source)
         writers = {
-            "waist-leg": self._write_waist_leg,
-            "waist-length": self._write_waist_length,
-            "bra": self._write_bra,
-            "shoe": self._write_shoe,
-            "age": self._write_age,
-            "proportion": self._write_proportion,
-            "regional-number": self._write_regional,
-            "pieces": self._write_pieces,
+            SizeDescriptionFormat.WAIST_LEG: self._write_waist_leg,
+            SizeDescriptionFormat.WAIST_LENGTH: self._write_waist_length,
+            SizeDescriptionFormat.BRA: self._write_bra,
+            SizeDescriptionFormat.SHOE: self._write_shoe,
+            SizeDescriptionFormat.AGE: self._write_age,
+            SizeDescriptionFormat.PROPORTION: self._write_proportion,
+            SizeDescriptionFormat.REGIONAL_NUMBER: self._write_regional,
+            SizeDescriptionFormat.PIECES: self._write_pieces,
         }
         if format is not None and format not in writers:
             raise ValueError(f"Unknown size description format {format!r}.")
@@ -255,7 +346,12 @@ class SizeDescription:
                 ),
             )
         text, used, extra = writers[encoder_id](chosen, order[0], source)
-        unused = [item for item in chosen if item not in used]
+        out_of_range = {item.text for item in extra if item.reason == "out-of-range"}
+        unused = [
+            item
+            for item in chosen
+            if item not in used and item.display() not in out_of_range
+        ]
         discarded = (
             discarded
             + extra
@@ -275,8 +371,9 @@ class SizeDescription:
         found: list[tuple[int, int, float, Size]] = []
         chart_region = self._chart_locale(region)
         for unit in SIZE_UNITS:
-            for pattern in unit.recognition_patterns():
-                explicit = not unit.recognition_is_fallback(pattern)
+            for entry, pattern in zip(
+                unit.recognition, unit.recognition_patterns(), strict=True
+            ):
                 for match in pattern.finditer(text):
                     value_at = (
                         match.start("value")
@@ -300,17 +397,17 @@ class SizeDescription:
                         region=region,
                         chart_region=chart_region,
                         product=product,
-                        explicit=explicit,
+                        explicit=entry.explicit,
                     )
                     if built is None:
                         continue
                     size, score = built
-                    if self._marked_pattern(unit, pattern):
-                        score += 0.12
+                    if entry.marked:
+                        score += _MARKED_BONUS
                         span = unit.size_type.length_range
                         if span is not None:
                             width = span.stop_inches - span.start_inches
-                            score += 0.05 / float(width)
+                            score += _MARKED_SPAN_BONUS / float(width)
                     found.append((match.start(), match.end(), score, size))
         chosen = _pick_nonoverlapping(found)
         if not chosen:
@@ -320,7 +417,7 @@ class SizeDescription:
         covered = sum(item[1] - item[0] for item in chosen)
         if covered < len(text.replace(" ", "")) / 2 and len(sizes) == 1:
             score -= 0.15
-        return _Hit("unit-patterns", sizes, max(score, 0.2))
+        return _Hit(SizeDescriptionFormat.UNIT_PATTERNS, sizes, max(score, 0.2))
 
     def _size_from_unit(
         self,
@@ -346,15 +443,12 @@ class SizeDescription:
             return None
         if not explicit and not unit.size_type.allows_bare_feed_value(product):
             return None
-        score = 0.82 if explicit else 0.48
-        score += unit.size_type.feed_score_adjustment(size.raw, product)
+        score = _EXPLICIT_SCORE if explicit else _BARE_SCORE
+        score += unit.size_type.affinity_adjustment(product)
+        score += _cross_type_penalty(unit.size_type, size.raw, product)
         if unit.locale is chart_region or unit.locale is region:
-            score += 0.05
+            score += _LOCALE_BONUS
         return size, score
-
-    def _marked_pattern(self, unit: SizeUnit, pattern: re.Pattern[str]) -> bool:
-        mark = unit.size_type.feed_mark
-        return bool(mark) and pattern.pattern.startswith(f"(?<![A-Za-z]){mark}")
 
     def _cup_span_ok(self, text: str, match: re.Match[str]) -> bool:
         """A cup letter counts on its own, or immediately after a band number."""
@@ -405,9 +499,9 @@ class SizeDescription:
         if len(sizes) < 2 and not discarded:
             return None
         if not sizes:
-            return _Hit("regions", (), 0.2, tuple(discarded))
+            return _Hit(SizeDescriptionFormat.REGIONS, (), 0.2, tuple(discarded))
         score = 0.98 if discarded else (0.96 if len(sizes) > 1 else 0.7)
-        return _Hit("regions", sizes, score, tuple(discarded))
+        return _Hit(SizeDescriptionFormat.REGIONS, sizes, score, tuple(discarded))
 
     def _numbered_fit(
         self, text: str, region: Locale, product: ProductType | None
@@ -423,7 +517,7 @@ class SizeDescription:
         number = _number(match.group(1))
         word = match.group(2).casefold()
         proportion = _FIT_WORDS.get(word)
-        if word in {"r", "s", "l"} and _in_span(number, 24, 50) and (
+        if word in {"r", "s", "l"} and _in_span(number, *_FEED_WAIST_INCHES) and (
             product is None or not product.family.accepts_fit_code
         ):
             return None
@@ -431,17 +525,17 @@ class SizeDescription:
         if chest is not None and _in_span(number, *chest):
             chart = self._chart_unit_for_number(region, number, product)
             label = Size(proportion or "regular", PROPORTION_SIZE)
-            return _Hit("numbered-fit", (Size(number, chart), label), 0.9)
+            return _Hit(SizeDescriptionFormat.NUMBERED_FIT, (Size(number, chart), label), 0.9)
         if word == "full length":
             return _Hit(
-                "numbered-fit",
+                SizeDescriptionFormat.NUMBERED_FIT,
                 (self._dress_size(number, region), Size("long", TOP_LENGTH_SIZE)),
                 0.88,
             )
         if proportion is None:
             return None
         return _Hit(
-            "numbered-fit",
+            SizeDescriptionFormat.NUMBERED_FIT,
             (self._dress_size(number, region), Size(proportion, PROPORTION_SIZE)),
             0.88,
         )
@@ -464,7 +558,7 @@ class SizeDescription:
         ):
             return None
         return _Hit(
-            "collar-sleeve",
+            SizeDescriptionFormat.COLLAR_SLEEVE,
             (Size(collar, INCH_COLLAR_SIZE), Size(sleeve, INCH_SLEEVE_SIZE)),
             0.92,
         )
@@ -479,9 +573,9 @@ class SizeDescription:
             return None
         locale = _prefix_locale(match.group(1), region)
         number = _number(match.group(2))
-        if self._reads_as_shoe(product, locale, number, fold_french=False):
+        if self._reads_as_shoe(product, locale, number):
             return _Hit(
-                "regional-number",
+                SizeDescriptionFormat.REGIONAL_NUMBER,
                 (Size(number, self._shoe_unit(locale)),),
                 0.9 if product is not None and product.family.reads_shoe_size else 0.7,
             )
@@ -489,13 +583,25 @@ class SizeDescription:
             score = (
                 0.92 if product is not None and product.family.reads_dress_size else 0.75
             )
-            return _Hit("regional-number", (self._dress_size(number, locale),), score)
+            return _Hit(
+                SizeDescriptionFormat.REGIONAL_NUMBER,
+                (self._dress_size(number, locale),),
+                score,
+            )
         if (
             product.family is ProductTypeFamily.BOTTOMS
             and locale in {Locale.UK, Locale.US, Locale.AU}
         ):
-            return _Hit("regional-number", (Size(number, INCH_WAIST_SIZE),), 0.8)
-        return _Hit("regional-number", (self._dress_size(number, locale),), 0.55)
+            return _Hit(
+                SizeDescriptionFormat.REGIONAL_NUMBER,
+                (Size(number, INCH_WAIST_SIZE),),
+                0.8,
+            )
+        return _Hit(
+            SizeDescriptionFormat.REGIONAL_NUMBER,
+            (self._dress_size(number, locale),),
+            0.55,
+        )
 
     def _bare_number(
         self, text: str, region: Locale, product: ProductType | None
@@ -504,7 +610,7 @@ class SizeDescription:
             return None
         number = _number(text)
         if product is not None and product.family.reads_shoe_size:
-            return _Hit("bare-number", (Size(number, self._shoe_unit(region)),), 0.72)
+            return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, self._shoe_unit(region)),), 0.72)
         collar = None if product is None else product.profile.collar_span
         if collar is not None and _in_span(number, *collar):
             unit = (
@@ -512,7 +618,7 @@ class SizeDescription:
                 if region in {Locale.UK, Locale.US, Locale.AU}
                 else CM_COLLAR_SIZE
             )
-            return _Hit("bare-number", (Size(number, unit),), 0.7)
+            return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, unit),), 0.7)
         waist = None if product is None else product.family.bare_waist_span
         if waist is not None and _in_span(number, *waist):
             unit = (
@@ -520,10 +626,10 @@ class SizeDescription:
                 if region in {Locale.UK, Locale.US, Locale.AU}
                 else CM_WAIST_SIZE
             )
-            return _Hit("bare-number", (Size(number, unit),), 0.62)
+            return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, unit),), 0.62)
         if product is None or product.family.reads_dress_size:
             return _Hit(
-                "bare-number",
+                SizeDescriptionFormat.BARE_NUMBER,
                 (self._dress_size(number, region),),
                 0.7 if product is not None and product.family.reads_dress_size else 0.45,
             )
@@ -542,7 +648,7 @@ class SizeDescription:
         if cup not in CUP_TOKENS or cup in {"S", "R", "L"}:
             return None
         band = _number(match.group(1))
-        if not _in_span(band, 28, 56):
+        if not _in_span(band, *_UK_BRA_BAND_INCHES):
             return None
         if product is not None and product.family is ProductTypeFamily.BRAS:
             score = 0.95
@@ -553,7 +659,11 @@ class SizeDescription:
         else:
             return None
         # Feed bra strings are read as a UK inch band. The cup letter is universal.
-        return _Hit("bra", (Size(band, UK_BAND_SIZE), Size(cup, UK_CUP_SIZE)), score)
+        return _Hit(
+            SizeDescriptionFormat.BRA,
+            (Size(band, UK_BAND_SIZE), Size(cup, UK_CUP_SIZE)),
+            score,
+        )
 
     def _waist_leg(
         self, text: str, region: Locale, product: ProductType | None
@@ -567,13 +677,16 @@ class SizeDescription:
             return None
         waist = _number(match.group(1))
         leg = _number(match.group(2))
-        if not _in_span(waist, 24, 50) or not _in_span(leg, 24, 42):
+        leg_low, leg_high = TROUSERS_INSEAM.length_inch_bounds()
+        if not _in_span(waist, *_FEED_WAIST_INCHES) or not _in_span(
+            leg, leg_low, leg_high
+        ):
             return None
         if product is not None and product.family is not ProductTypeFamily.BOTTOMS:
             return None
         score = 0.93 if product is not None else 0.8
         return _Hit(
-            "waist-leg",
+            SizeDescriptionFormat.WAIST_LEG,
             (Size(waist, INCH_WAIST_SIZE), Size(leg, INCH_TROUSERS_INSEAM)),
             score,
         )
@@ -585,14 +698,14 @@ class SizeDescription:
         if match is None:
             return None
         waist = _number(match.group(1))
-        if not _in_span(waist, 24, 50):
+        if not _in_span(waist, *_FEED_WAIST_INCHES):
             return None
         if product is not None and product.family is not ProductTypeFamily.BOTTOMS:
             return None
         code = {"S": "short", "R": "regular", "L": "long"}[match.group(2).upper()]
         score = 0.9 if product is not None else 0.74
         return _Hit(
-            "waist-length",
+            SizeDescriptionFormat.WAIST_LENGTH,
             (Size(waist, INCH_WAIST_SIZE), Size(code, TROUSER_LENGTH_SIZE)),
             score,
         )
@@ -600,36 +713,44 @@ class SizeDescription:
     def _proportion(
         self, text: str, region: Locale, product: ProductType | None
     ) -> _Hit | None:
-        token = _PROPORTION_WORDS.get(text.casefold())
-        if token is None:
+        if _explicit_word(text, PROPORTION_SIZE):
+            return _Hit(
+                SizeDescriptionFormat.PROPORTION,
+                (Size(text, PROPORTION_SIZE),),
+                0.9,
+            )
+        for entry in PROPORTION_SIZE.recognition:
+            if not entry.explicit or entry.marked:
+                continue
             embedded = re.fullmatch(
-                rf"{_NUM}\s+(extra\s+tall|tall|petite|pt)", text, flags=re.IGNORECASE
+                rf"({_NUM})\s+{entry.expression}", text, flags=re.IGNORECASE
             )
             if embedded is None:
-                return None
-            token = _PROPORTION_WORDS[embedded.group(1).casefold()]
-            number = _number(embedded.group(0).split()[0])
+                continue
             return _Hit(
-                "proportion",
-                (self._dress_size(number, region), Size(token, PROPORTION_SIZE)),
+                SizeDescriptionFormat.PROPORTION,
+                (
+                    self._dress_size(_number(embedded.group(1)), region),
+                    Size(embedded.group("value"), PROPORTION_SIZE),
+                ),
                 0.86,
             )
-        return _Hit("proportion", (Size(token, PROPORTION_SIZE),), 0.9)
+        return None
 
     def _length_word(
         self, text: str, region: Locale, product: ProductType | None
     ) -> _Hit | None:
-        if text.casefold() not in _LENGTH_WORDS:
-            return None
         if product is not None and product.family is ProductTypeFamily.TOPS:
-            return _Hit("length-word", (Size(text, TOP_LENGTH_SIZE),), 0.84)
-        if product is None or product.family is ProductTypeFamily.BOTTOMS:
-            return _Hit(
-                "length-word",
-                (Size(text, TROUSER_LENGTH_SIZE),),
-                0.8 if product is not None else 0.55,
-            )
-        return None
+            unit = TOP_LENGTH_SIZE
+            score = 0.84
+        elif product is None or product.family is ProductTypeFamily.BOTTOMS:
+            unit = TROUSER_LENGTH_SIZE
+            score = 0.8 if product is not None else 0.55
+        else:
+            return None
+        if not _explicit_word(text, unit):
+            return None
+        return _Hit(SizeDescriptionFormat.LENGTH_WORD, (Size(text, unit),), score)
 
     def _shoe_width(
         self, text: str, region: Locale, product: ProductType | None
@@ -657,7 +778,7 @@ class SizeDescription:
             locale = _prefix_locale(sized.group(1) or region.value, region)
             score = 0.9 if product is not None and product.family.reads_shoe_size else 0.7
             return _Hit(
-                "shoe-width",
+                SizeDescriptionFormat.SHOE_WIDTH,
                 (
                     Size(_number(sized.group(2)), self._shoe_unit(locale)),
                     Size(sized.group(3), SHOE_WIDTH_SIZE),
@@ -666,13 +787,13 @@ class SizeDescription:
             )
         if words and (product is None or product.family.reads_shoe_size):
             return _Hit(
-                "shoe-width",
+                SizeDescriptionFormat.SHOE_WIDTH,
                 (Size(words.group(1), SHOE_WIDTH_SIZE),),
                 0.88 if product is not None and product.family.reads_shoe_size else 0.6,
             )
         if letter and (product is None or product.family.reads_shoe_size):
             return _Hit(
-                "shoe-width",
+                SizeDescriptionFormat.SHOE_WIDTH,
                 (Size(letter.group(1), SHOE_WIDTH_SIZE),),
                 0.84 if product is not None and product.family.reads_shoe_size else 0.5,
             )
@@ -695,7 +816,7 @@ class SizeDescription:
                 size = Size(text, unit)
             except ValueError:
                 continue
-            return _Hit("age", (size,), 0.93)
+            return _Hit(SizeDescriptionFormat.AGE, (size,), 0.93)
         return None
 
     def _chart_locale(self, locale: Locale) -> Locale:
@@ -712,29 +833,27 @@ class SizeDescription:
         return Size(number, self._chart_unit(DRESS, locale))
 
     def _reads_as_shoe(
-        self,
-        product: ProductType | None,
-        locale: Locale,
-        number: Decimal,
-        *,
-        fold_french: bool,
+        self, product: ProductType | None, locale: Locale, number: Decimal
     ) -> bool:
         """Whether this number is an adult shoe size.
 
         A footwear product type always is. With no product type, an EU number
-        in the shoe span is too. Multi-region cells fold a French prefix onto
-        EU before that guess; a single ``FR 40`` cell does not.
+        in the shoe span is too. A French prefix is folded onto EU before that
+        guess, so a lone ``FR 40`` and a multi-region cell use the same rule.
         """
         if product is not None and product.family.reads_shoe_size:
             return True
-        checked = self._chart_locale(locale) if fold_french else locale
         low, high = _UNLABELLED_EU_SHOE
-        return product is None and checked is Locale.EU and _in_span(number, low, high)
+        return (
+            product is None
+            and self._chart_locale(locale) is Locale.EU
+            and _in_span(number, low, high)
+        )
 
     def _chart_unit_for_number(
         self, locale: Locale, number: Decimal, product: ProductType | None
     ) -> SizeUnit:
-        if self._reads_as_shoe(product, locale, number, fold_french=True):
+        if self._reads_as_shoe(product, locale, number):
             return self._shoe_unit(locale)
         chest = None if product is None else product.profile.chest_span
         if chest is not None and _in_span(number, *chest):
@@ -763,13 +882,18 @@ class SizeDescription:
         discarded: list[DiscardedToken] = []
         for group in grouped.values():
             if len(group) == 1:
-                kept.append(self._maybe_convert_length(group[0], order[0]))
-                continue
-            winner = self._prefer(group, order, source)
-            kept.append(self._maybe_convert_length(winner, order[0]))
-            for other in group:
-                if other is not winner:
-                    discarded.append(DiscardedToken(other.display(), "duplicate"))
+                chosen = group[0]
+                others: tuple[Size, ...] = ()
+            else:
+                chosen = self._prefer(group, order, source)
+                others = tuple(other for other in group if other is not chosen)
+            converted = self._maybe_convert_length(chosen, order[0])
+            if converted is None:
+                discarded.append(DiscardedToken(chosen.display(), "out-of-range"))
+            else:
+                kept.append(converted)
+            for other in others:
+                discarded.append(DiscardedToken(other.display(), "duplicate"))
         return tuple(kept), tuple(discarded)
 
     def _prefer(self, group: list[Size], order: tuple[Locale, ...], source: Locale) -> Size:
@@ -784,57 +908,69 @@ class SizeDescription:
 
         return sorted(group, key=rank)[0]
 
-    def _maybe_convert_length(self, size: Size, region: Locale) -> Size:
+    def _maybe_convert_length(self, size: Size, region: Locale) -> Size | None:
         if size.size_type.family is not SizeFamily.LENGTH or not size.size_unit.length_unit:
             return size
         wanted = "cm" if region in {Locale.EU, Locale.FR} else "in"
         if size.size_unit.length_unit == wanted:
             return size
         target = size_unit_for_length_unit(size.size_type, wanted)
-        return size.convert(target, demographic=_length_demographic()).size
+        try:
+            return size.convert(target, demographic=_length_demographic()).size
+        except LengthOutOfRangeError:
+            return None
 
     def _candidate_formats(
         self, sizes: tuple[Size, ...], product: ProductType | None
-    ) -> tuple[str, ...]:
-        slugs = {size.size_type.slug for size in sizes}
-        found: list[str] = []
-        if "waist" in slugs and "trousers-inseam" in slugs:
-            found.append("waist-leg")
-        if "waist" in slugs and "trouser-length" in slugs:
-            found.append("waist-length")
-        if "band-size" in slugs and "cup-size" in slugs:
-            found.append("bra")
+    ) -> tuple[SizeDescriptionFormat, ...]:
+        found_types = {size.size_type for size in sizes}
+        found: list[SizeDescriptionFormat] = []
+        if WAIST in found_types and TROUSERS_INSEAM in found_types:
+            found.append(SizeDescriptionFormat.WAIST_LEG)
+        if WAIST in found_types and TROUSER_LENGTH in found_types:
+            found.append(SizeDescriptionFormat.WAIST_LENGTH)
+        if BAND_SIZE in found_types and CUP_SIZE in found_types:
+            found.append(SizeDescriptionFormat.BRA)
         if (
             product is not None
             and product.family.reads_shoe_size
-            and ("adult-shoe" in slugs or "shoe-width" in slugs)
+            and (ADULT_SHOE in found_types or SHOE_WIDTH in found_types)
         ):
-            found.append("shoe")
-        if slugs <= {"age-months", "age-years"} and slugs:
-            found.append("age")
-        if "proportion" in slugs and slugs <= {"proportion", "dress"}:
-            found.append("proportion")
-        if slugs <= {"dress"} or (
-            product is not None and product.family.reads_dress_size and "dress" in slugs
+            found.append(SizeDescriptionFormat.SHOE)
+        if found_types and found_types <= {AGE_MONTHS, AGE_YEARS}:
+            found.append(SizeDescriptionFormat.AGE)
+        if PROPORTION in found_types and found_types <= {PROPORTION, DRESS}:
+            found.append(SizeDescriptionFormat.PROPORTION)
+        if found_types <= {DRESS} or (
+            product is not None
+            and product.family.reads_dress_size
+            and DRESS in found_types
         ):
-            found.append("regional-number")
-        if not found and slugs:
-            found.append("pieces")
+            found.append(SizeDescriptionFormat.REGIONAL_NUMBER)
+        if not found and found_types:
+            found.append(SizeDescriptionFormat.PIECES)
         return tuple(found)
 
     def _guess_format(
         self, sizes: tuple[Size, ...], product: ProductType | None
-    ) -> str | None:
+    ) -> SizeDescriptionFormat | None:
         options = self._candidate_formats(sizes, product)
         return options[0] if options else None
 
     def _write_waist_leg(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        waist = next(size for size in sizes if size.size_type.slug == "waist")
-        leg = next(size for size in sizes if size.size_type.slug == "trousers-inseam")
+        waist = next(size for size in sizes if size.size_type is WAIST)
+        leg = next(size for size in sizes if size.size_type is TROUSERS_INSEAM)
         waist_in = _as_inches(waist)
         leg_in = _as_inches(leg)
+        discarded: list[DiscardedToken] = []
+        if waist_in is None:
+            discarded.append(DiscardedToken(waist.display(), "out-of-range"))
+        if leg_in is None:
+            discarded.append(DiscardedToken(leg.display(), "out-of-range"))
+        if waist_in is None or leg_in is None:
+            return "", (), tuple(discarded)
         return (
             f"{format_raw(waist_in.raw)}/{format_raw(leg_in.raw)}",
             (waist_in, leg_in),
@@ -844,13 +980,13 @@ class SizeDescription:
     def _write_waist_length(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        waist = next(size for size in sizes if size.size_type.slug == "waist")
-        length = next(size for size in sizes if size.size_type.slug == "trouser-length")
+        waist = next(size for size in sizes if size.size_type is WAIST)
+        length = next(size for size in sizes if size.size_type is TROUSER_LENGTH)
         waist_in = _as_inches(waist)
+        if waist_in is None:
+            return "", (), (DiscardedToken(waist.display(), "out-of-range"),)
         vocabulary = length.size_type.vocabulary
-        code = ""
-        if vocabulary is not None:
-            code = vocabulary.shorthand.get(str(length.raw), "")
+        code = "" if vocabulary is None else vocabulary.shorthand_for(str(length.raw))
         if not code:
             code = length.size_type.label_text(str(length.raw), region)
         return f"{format_raw(waist_in.raw)}{code}", (waist_in, length), ()
@@ -858,8 +994,8 @@ class SizeDescription:
     def _write_bra(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        band = next(size for size in sizes if size.size_type.slug == "band-size")
-        cup = next(size for size in sizes if size.size_type.slug == "cup-size")
+        band = next(size for size in sizes if size.size_type is BAND_SIZE)
+        cup = next(size for size in sizes if size.size_type is CUP_SIZE)
         band_text = format_raw(band.raw) if isinstance(band.raw, Decimal) else band.raw
         return f"{band_text}{cup.display()}", (band, cup), ()
 
@@ -870,9 +1006,7 @@ class SizeDescription:
             (size for size in sizes if size.size_type.family is SizeFamily.SHOE_SIZE),
             None,
         )
-        width = next(
-            (size for size in sizes if size.size_type.slug == "shoe-width"), None
-        )
+        width = next((size for size in sizes if size.size_type is SHOE_WIDTH), None)
         parts: list[str] = []
         used: list[Size] = []
         if shoe is not None:
@@ -887,17 +1021,15 @@ class SizeDescription:
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
         age = next(
-            size
-            for size in sizes
-            if size.size_type.slug in {"age-months", "age-years"}
+            size for size in sizes if size.size_type in {AGE_MONTHS, AGE_YEARS}
         )
         return age.display(), (age,), ()
 
     def _write_proportion(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        proportion = next(size for size in sizes if size.size_type.slug == "proportion")
-        dress = next((size for size in sizes if size.size_type.slug == "dress"), None)
+        proportion = next(size for size in sizes if size.size_type is PROPORTION)
+        dress = next((size for size in sizes if size.size_type is DRESS), None)
         label = proportion.size_type.label_text(str(proportion.raw), region)
         if dress is None:
             return label, (proportion,), ()
@@ -906,7 +1038,7 @@ class SizeDescription:
     def _write_regional(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        dress = next(size for size in sizes if size.size_type.slug == "dress")
+        dress = next(size for size in sizes if size.size_type is DRESS)
         return dress.display(), (dress,), ()
 
     def _write_pieces(
@@ -930,7 +1062,7 @@ def _pick_nonoverlapping(
         if any(not (item[1] <= kept[0] or item[0] >= kept[1]) for kept in chosen):
             continue
         if any(
-            kept[3].size_type.slug == item[3].size_type.slug
+            kept[3].size_type is item[3].size_type
             and kept[3].size_unit.locale == item[3].size_unit.locale
             for kept in chosen
         ):
@@ -983,14 +1115,17 @@ def _length_demographic() -> Demographic:
     return Demographic(AgeGroup.ADULT, Gender.UNISEX)
 
 
-def _as_inches(size: Size) -> Size:
+def _as_inches(size: Size) -> Size | None:
     if size.size_unit.length_unit == "in":
         return size
     if size.size_unit.length_unit == "cm":
-        return size.convert(
-            size_unit_for_length_unit(size.size_type, "in"),
-            demographic=_length_demographic(),
-        ).size
+        try:
+            return size.convert(
+                size_unit_for_length_unit(size.size_type, "in"),
+                demographic=_length_demographic(),
+            ).size
+        except LengthOutOfRangeError:
+            return None
     return size
 
 

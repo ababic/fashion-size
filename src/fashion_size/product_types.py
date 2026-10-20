@@ -52,15 +52,6 @@ class ProductTypeFamily(StrEnum):
         return None
 
     @property
-    def length_slug(self) -> str:
-        """Label size type for a length word such as ``regular`` or ``long``."""
-        if self is ProductTypeFamily.TOPS:
-            return "top-length"
-        if self is ProductTypeFamily.BOTTOMS:
-            return "trouser-length"
-        return ""
-
-    @property
     def accepts_fit_code(self) -> bool:
         """``16T`` and ``8R`` are a size plus a proportion on these families."""
         return self in {ProductTypeFamily.DRESSES, ProductTypeFamily.TOPS}

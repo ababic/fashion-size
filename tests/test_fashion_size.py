@@ -768,8 +768,6 @@ def test_every_product_type_belongs_to_one_family():
     assert not ProductType.ACTIVEWEAR_BOTTOMS.takes_letter_size
     assert ProductTypeFamily.BOTTOMS.bare_waist_span == (24, 44)
     assert ProductTypeFamily.BOTTOMS.chart_waist_span == (24, 50)
-    assert ProductTypeFamily.TOPS.length_slug == "top-length"
-    assert ProductTypeFamily.BOTTOMS.length_slug == "trouser-length"
     assert ProductTypeFamily.DRESSES.accepts_fit_code
     assert ProductTypeFamily.TOPS.accepts_fit_code
     assert not ProductTypeFamily.BOTTOMS.accepts_fit_code
