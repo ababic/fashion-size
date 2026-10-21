@@ -184,6 +184,12 @@ def test_locale_charts():
         == 23
     )
     assert (
+        Size.from_raw(6, UK_KIDS_SHOE_SIZE)
+        .convert_to_locale("eu", demographic=Demographic("baby", "male"))
+        .raw
+        == 23
+    )
+    assert (
         Size.from_raw(0, UK_BABY_SHOE_SIZE)
         .convert_to_locale("eu", demographic=Demographic("baby", "unisex"))
         .raw
@@ -284,6 +290,29 @@ def test_cup_alpha_tokens_convert_with_identity_across_locales():
     ]
     assert cup_sort_key("HH") == cup_sort_key("L")
     assert cup_sort_key("XS") < cup_sort_key("S")
+
+
+def test_kids_shoe_default_chart_covers_baby_demographics():
+    """UK kids sizes do not change when the catalogue age group is baby."""
+    size_type = UK_KIDS_SHOE_SIZE.size_type
+    child = default_scale(size_type, "child", "female")
+    for gender in ("male", "female", "unisex"):
+        scale = default_scale(size_type, "baby", gender)
+        assert scale.age_group == "baby"
+        assert scale.gender == ""
+        assert scale.rows == child.rows
+    converted = Size.from_raw(13, UK_KIDS_SHOE_SIZE).convert_to_locale(
+        "us", demographic=Demographic("baby", "unisex")
+    )
+    assert converted.raw == 1
+    assert converted.source.kind == ConversionSourceKind.DEFAULT
+    assert converted.source.default_reason == DefaultChartReason.NO_BRAND
+    assert converted.source.default_scale is not None
+    assert converted.source.default_scale.age_group == "baby"
+    values = shoe_attribute_values(
+        UK_KIDS_SHOE_SIZE, age_group="baby", gender="male"
+    )
+    assert values[0] == Decimal("6")
 
 
 def test_shoe_alpha_tokens_convert_with_identity_across_locales():

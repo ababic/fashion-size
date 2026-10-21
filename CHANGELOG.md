@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The default kids shoe chart covers baby catalogue age groups as well as children. A kids shoe size for baby boys, baby girls, or unisex babies converts on the same UK / EU / US / AU rows as a child's kids shoe. Baby shoe sizes remain on the baby shoe chart.
+
 ## 2026.10.20
 
 - Label size types, their units, and label sizes can be hashed. A vocabulary stores its token pairs as tuples.
