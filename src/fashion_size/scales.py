@@ -208,9 +208,11 @@ _MEN_SHOE_ROWS: tuple[tuple[_Number, _Number, _Number, _Number], ...] = (
     (13, 48, 14, 13),
 )
 
-# Kids shoes (UK 6–13 then youth 1–5.5). Separate from baby and adult size types.
-# AU = UK (Australian children's shoes use UK numbers), US = UK + 1. UK → EU follows
-# the Clarks kids chart; UK 2.5–5.5 match the adult chart for the same UK size.
+# Kids shoes (UK 6–13 then youth 1–5.5). Separate from the baby shoe size type
+# (UK 0–5.5) and from adult shoes. AU = UK (Australian children's shoes use UK
+# numbers), US = UK + 1. UK → EU follows the Clarks kids chart; UK 2.5–5.5 match
+# the adult chart for the same UK size. Child and baby catalogue labels share
+# these rows: UK 6 is still EU 23 when the product is filed as baby boys.
 _KIDS_SHOE_ROWS: tuple[tuple[_Number, _Number, _Number, _Number], ...] = (
     (6, 23, 7, 6),
     (6.5, 23.5, 7.5, 6.5),
@@ -337,7 +339,9 @@ DEFAULT_SCALES: dict[tuple[str, str, str], tuple[ConversionScale, ...]] = {
     **_charts(DRESS, (_CHILD_ALL,), _KIDS_DRESS_ROWS),
     **_charts(ADULT_SHOE, (_ADULT_FEMALE,), _WOMEN_SHOE_ROWS),
     **_charts(ADULT_SHOE, (_ADULT_MALE,), _MEN_SHOE_ROWS),
-    **_charts(KIDS_SHOE, (_CHILD_ALL,), _KIDS_SHOE_ROWS),
+    # One kids shoe chart for children and for babies. A brand can still store
+    # separate boys and girls rows. Dress, waist, and chest stay child-only.
+    **_charts(KIDS_SHOE, (_CHILD_ALL, _BABY_ALL), _KIDS_SHOE_ROWS),
     # Baby shoe charts are not gendered unless a brand adds a boys or girls row.
     **_charts(BABY_SHOE, (_BABY_ALL,), _BABY_SHOE_ROWS),
     # Adult women. A brand can add a product-type-group chart (bras vs swimwear).
@@ -364,7 +368,7 @@ def default_scale(
     ``as_of`` is when the raw size was captured. Omit it to use the chart in force
     now. Unisex products use the male chart. Children and babies fall back to the
     shared chart for that age group when there is no boys or girls chart in force
-    at that instant.
+    at that instant. Kids shoe sizes use that shared chart for both age groups.
     """
     moment = as_of_moment(as_of)
     age, sex = resolve_age_gender(age_group, gender)
