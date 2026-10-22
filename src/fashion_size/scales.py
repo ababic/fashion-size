@@ -34,6 +34,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from fashion_size.brands import as_of_moment
+from fashion_size.chart_coverage import (
+    chart_age_groups_for_lookup,
+    default_chart_age_groups,
+)
 from fashion_size.demographics import AgeGroup, Gender
 from fashion_size.types import (
     ADULT_SHOE,
@@ -339,9 +343,12 @@ DEFAULT_SCALES: dict[tuple[str, str, str], tuple[ConversionScale, ...]] = {
     **_charts(DRESS, (_CHILD_ALL,), _KIDS_DRESS_ROWS),
     **_charts(ADULT_SHOE, (_ADULT_FEMALE,), _WOMEN_SHOE_ROWS),
     **_charts(ADULT_SHOE, (_ADULT_MALE,), _MEN_SHOE_ROWS),
-    # One kids shoe chart for children and for babies. A brand can still store
-    # separate boys and girls rows. Dress, waist, and chest stay child-only.
-    **_charts(KIDS_SHOE, (_CHILD_ALL, _BABY_ALL), _KIDS_SHOE_ROWS),
+    # One kids shoe chart per covered catalogue age (see ``CHART_AGE_COVERAGE``).
+    **_charts(
+        KIDS_SHOE,
+        tuple((group.value, "") for group in default_chart_age_groups(KIDS_SHOE.slug)),
+        _KIDS_SHOE_ROWS,
+    ),
     # Baby shoe charts are not gendered unless a brand adds a boys or girls row.
     **_charts(BABY_SHOE, (_BABY_ALL,), _BABY_SHOE_ROWS),
     # Adult women. A brand can add a product-type-group chart (bras vs swimwear).
@@ -368,21 +375,25 @@ def default_scale(
     ``as_of`` is when the raw size was captured. Omit it to use the chart in force
     now. Unisex products use the male chart. Children and babies fall back to the
     shared chart for that age group when there is no boys or girls chart in force
-    at that instant. Kids shoe sizes use that shared chart for both age groups.
+    at that instant. Chart age fallbacks (for example ``kids-shoe`` on a baby label)
+    follow ``chart_age_groups_for_lookup``.
     """
     moment = as_of_moment(as_of)
     age, sex = resolve_age_gender(age_group, gender)
-    for candidate in chart_genders(age, sex):
-        for scale in DEFAULT_SCALES.get((size_type.slug, age, candidate), ()):
-            if scale.effective_from <= moment and (
-                scale.effective_until is None or moment < scale.effective_until
-            ):
-                return scale
-    tried = " or ".join(
-        format_age_gender(age, candidate) for candidate in chart_genders(age, sex)
-    )
+    tried: list[str] = []
+    for chart_age in chart_age_groups_for_lookup(size_type.slug, age):
+        for candidate in chart_genders(chart_age, sex):
+            label = format_age_gender(chart_age, candidate)
+            if label not in tried:
+                tried.append(label)
+            for scale in DEFAULT_SCALES.get((size_type.slug, chart_age, candidate), ()):
+                if scale.effective_from <= moment and (
+                    scale.effective_until is None or moment < scale.effective_until
+                ):
+                    return scale
+    tried_text = " or ".join(tried)
     raise MissingScaleError(
-        f"No default {size_type.label} conversion chart for {tried}. Pass a brand-specific ConversionScale."
+        f"No default {size_type.label} conversion chart for {tried_text}. Pass a brand-specific ConversionScale."
     )
 
 

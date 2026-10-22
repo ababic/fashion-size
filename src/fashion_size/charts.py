@@ -25,6 +25,7 @@ from fashion_size.brands import (
     as_of_moment,
     resolve_brand_name,
 )
+from fashion_size.chart_coverage import chart_age_groups_for_lookup
 from fashion_size.demographics import AgeGroup, Gender
 from fashion_size.product_types import (
     PRODUCT_TYPE_SLUGS,
@@ -304,9 +305,11 @@ def chart_for(
     the same series. Product-type and gender rules run inside that instant: a chart that
     lists ``product_type`` wins over a chart with no product types (one chart for
     every product type). When ``product_type`` is omitted, a chart for that size
-    type and demographic is returned only when there is exactly one. A male or
+    type and demographic is returned only when there is exactly one.     A male or
     female chart wins over a chart with a blank gender (the shared chart for that
-    age group).
+    age group). When ``chart_age_groups_for_lookup`` lists more than one chart age
+    (for example ``kids-shoe`` on a baby label), charts stored under a fallback age
+    are tried only after the product's own age yields no match.
     """
     moment = as_of_moment(as_of) if as_of is not None else None
     age = age_group.strip().lower()
@@ -316,27 +319,28 @@ def chart_for(
         product_type = resolve_product_type(product_type)
     else:
         product_type = None
-    candidates = [
-        chart
-        for chart in charts_for_brand(brand_name)
-        if chart.size_type == size_type_slug
-        and chart.age_group == age
-        and chart.gender in {sex, ""}
-        and (moment is None or _chart_in_force(chart, moment))
-    ]
-    if product_type:
-        explicit = [
-            chart for chart in candidates if product_type in chart.product_types
+    for chart_age in chart_age_groups_for_lookup(size_type_slug, age):
+        candidates = [
+            chart
+            for chart in charts_for_brand(brand_name)
+            if chart.size_type == size_type_slug
+            and chart.age_group == chart_age
+            and chart.gender in {sex, ""}
+            and (moment is None or _chart_in_force(chart, moment))
         ]
-        pool = explicit or [chart for chart in candidates if not chart.product_types]
-        gendered = [chart for chart in pool if chart.gender == sex]
-        candidates = gendered or pool
-    elif sex:
-        gendered = [chart for chart in candidates if chart.gender == sex]
-        if gendered:
-            candidates = gendered
-    if len(candidates) == 1:
-        return candidates[0]
-    if candidates and as_of is None:
-        return _latest_chart(candidates)
+        if product_type:
+            explicit = [
+                chart for chart in candidates if product_type in chart.product_types
+            ]
+            pool = explicit or [chart for chart in candidates if not chart.product_types]
+            gendered = [chart for chart in pool if chart.gender == sex]
+            candidates = gendered or pool
+        elif sex:
+            gendered = [chart for chart in candidates if chart.gender == sex]
+            if gendered:
+                candidates = gendered
+        if len(candidates) == 1:
+            return candidates[0]
+        if candidates and as_of is None:
+            return _latest_chart(candidates)
     return None

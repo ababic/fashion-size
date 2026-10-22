@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2026.10.22
+
+- ``CHART_AGE_COVERAGE`` documents which catalogue age groups each size type's charts may serve. Brand ``chart_for`` lookup uses the same age fallbacks as default scales: a ``kids-shoe`` override stored under ``child`` also applies to baby-labelled products when no baby chart exists.
+
 ## 2026.10.21
 
 - The default kids shoe chart covers baby catalogue age groups as well as children. A kids shoe size for baby boys, baby girls, or unisex babies converts on the same UK / EU / US / AU rows as a child's kids shoe. Baby shoe sizes remain on the baby shoe chart.

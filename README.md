@@ -116,6 +116,21 @@ Both return a `ConvertedSize` with the resulting size and a `ConversionSource` (
 
 Default charts use the same windows. The charts shipped in this package apply from the first representable instant until a later default for that size type and demographic replaces them. A capture time before a brand's first override uses the default chart that was in force then.
 
+### Chart age coverage
+
+A **size type** defines the numeric scale on the attribute (`kids-shoe`, `baby-shoe`, …). A **catalogue age group** (`child`, `baby`, `adult`) is how the product is filed. `fashion_size.chart_coverage.CHART_AGE_COVERAGE` lists, per size type, every catalogue age that may use that type's conversion charts.
+
+| Size type | Catalogue ages covered | Notes |
+| --- | --- | --- |
+| `baby-shoe` | `baby` | UK 0–5.5 scale |
+| `kids-shoe` | `child`, `baby` | UK 6+ youth scale; same rows whether the item is filed as child or baby |
+| `adult-shoe` | `adult` | |
+| `dress` | `adult`, `child` | Separate default row sets per age |
+| `waist-size`, `chest-size` | `adult`, `child` | Kids rows are child-only; no baby waist/chest charts |
+| `cup-size`, `band-size` | `adult` | |
+
+Lookup tries charts stored under the product's age first. For `kids-shoe` on a **baby** label, a brand override filed under **`child`** is used when there is no baby chart — the same rule as the default kids shoe chart. Other size types do not fall back across catalogue ages.
+
 `brand_name` may be any string. A `BrandName` selects that brand's chart. Any other name uses the default chart unless `strict_brand_name` is set. An unknown `product_type` is an error.
 
 French dress, shoe, cup, and chest labels are the EU size (`"fr"` converts to that EU value). French band size is the EU centimetre label plus 15. French waist size is not on the chart. Length size types convert between centimetres and inches (`1 in = 2.54 cm`) only inside each type's inch bounds (see the conversion table). Display rounding (nearest centimetre, nearest half inch) does not change the stored value.
