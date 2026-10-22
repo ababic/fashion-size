@@ -24,6 +24,10 @@ from fashion_size import (
     register_display_language,
 )
 from fashion_size.brands import BRANDS, BrandName
+from fashion_size.chart_coverage import (
+    CHART_AGE_COVERAGE,
+    chart_age_groups_for_lookup,
+)
 from fashion_size.charts import (
     BrandConversionChart,
     _apply_effective_windows,
@@ -290,6 +294,43 @@ def test_cup_alpha_tokens_convert_with_identity_across_locales():
     ]
     assert cup_sort_key("HH") == cup_sort_key("L")
     assert cup_sort_key("XS") < cup_sort_key("S")
+
+
+def test_chart_age_coverage_and_kids_shoe_lookup_order():
+    from fashion_size.demographics import AgeGroup
+
+    assert AgeGroup.BABY in CHART_AGE_COVERAGE["kids-shoe"]
+    assert AgeGroup.BABY not in CHART_AGE_COVERAGE["dress"]
+    assert chart_age_groups_for_lookup("kids-shoe", "baby") == ("baby", "child")
+    assert chart_age_groups_for_lookup("kids-shoe", "child") == ("child",)
+    assert chart_age_groups_for_lookup("dress", "child") == ("child",)
+
+
+def test_brand_kids_shoe_child_chart_serves_baby_labels():
+    child = chart_for(
+        "Salt-Water Sandals",
+        "kids-shoe",
+        "child",
+        "male",
+        product_type=ProductType.SHOES,
+    )
+    baby = chart_for(
+        "Salt-Water Sandals",
+        "kids-shoe",
+        "baby",
+        "male",
+        product_type=ProductType.SHOES,
+    )
+    assert child is not None and baby is child
+    converted = Size.from_raw(9, UK_KIDS_SHOE_SIZE).convert_to_locale(
+        "eu",
+        demographic=Demographic("baby", "male"),
+        brand_name="Salt-Water Sandals",
+        product_type=ProductType.SHOES,
+    )
+    assert converted.raw == 26
+    assert converted.source.kind == ConversionSourceKind.BRAND
+    assert converted.source.brand_chart is child
 
 
 def test_kids_shoe_default_chart_covers_baby_demographics():
