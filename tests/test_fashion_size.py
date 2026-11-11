@@ -593,8 +593,10 @@ def test_conversion_rejects_unknown_or_incompatible_values():
         Size.from_raw(Decimal("88.1"), INCH_CHEST_SIZE).convert(
             "cm", demographic=Demographic("adult", "unisex")
         )
-    with pytest.raises(ValueError, match="cup"):
-        Size.from_raw("D-E", UK_CUP_SIZE)
+    cup_range = Size.from_raw("D-E", UK_CUP_SIZE)
+    assert cup_range.raw == "D-E"
+    with pytest.raises(UnknownSizeError):
+        cup_range.convert_to_locale("eu", demographic=Demographic("adult", "female"))
 
     same = Size.from_raw(10, UK_DRESS_SIZE)
     unchanged = same.convert(

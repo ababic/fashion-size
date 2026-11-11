@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bra feed decoding: a bare band with no cup uses the feed `source_region` (UK/US inch 28–56, EU cm 60–130, FR EU+15, AU dress-style 6–34 even). Otherwise an even UK dress size (4–24) applies on bras. Generic plus cup strings (`M C`, `Medium A-C`) decode as letter and cup on bras and swimwear. Shoe-width patterns no longer match on non-footwear products.
+
 ## 2026.11.11
 
 - On a bra, a bare even number from 4 to 24 is a UK dress size. A number from 28 to 56 stays a UK band, so `30` and `32` are bands and `32C` is still band 32 and cup C. A cup span (`A-C`, `D-E`, `F-G`, `GG-H`) is a `cup-range` label and is not converted. Dresses, skirts, and tops are unchanged.

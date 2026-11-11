@@ -41,6 +41,7 @@ from fashion_size.types import (
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
     LETTER,
+    LETTER_SIZE,
     PROPORTION,
     PROPORTION_SIZE,
     SHOE_WIDTH,
@@ -89,7 +90,12 @@ _UK_BRA_BAND_INCHES = (28, 56)
 # this list: 28 and above are bands, and 26 is not one of these dress lines.
 _BRA_DRESS_LOW = 4
 _BRA_DRESS_HIGH = 24
+# Default chart columns: EU cm (60–130), AU dress-style (6–34 even).
+_EU_BRA_BAND_CM = (60, 130)
+_AU_BRA_BAND_DRESS = (6, 34)
+_BRA_BAND_REGION_BONUS = 0.28
 _CUP_RANGE_TEXT = r"GG\s*[-–]\s*H|A\s*[-–]\s*C|D\s*[-–]\s*E|F\s*[-–]\s*G"
+_CUP_LETTER = r"[A-Z]{1,3}(?:-[A-Z]{1,3})?"
 
 # Context that looks like a size token but is a quantity, a year, a collection
 # name, or a garment phrase. A recognition match inside one of these is not a size.
@@ -136,6 +142,7 @@ class SizeDescriptionFormat(StrEnum):
     WAIST_LEG = "waist-leg"
     WAIST_LENGTH = "waist-length"
     BRA = "bra"
+    BRA_GENERIC_CUP = "bra-generic-cup"
     SHOE_WIDTH = "shoe-width"
     PROPORTION = "proportion"
     LENGTH_WORD = "length-word"
@@ -223,6 +230,64 @@ def _in_span(value: Decimal, low: int | Decimal, high: int | Decimal) -> bool:
     return Decimal(low) <= value <= Decimal(high)
 
 
+def _bra_generic_cup_product(product: ProductType | None) -> bool:
+    """Bras and some swim lines sell a letter size with a cup or cup range."""
+    return product in {ProductType.BRAS, ProductType.SWIMWEAR}
+
+
+def _bra_feed_band_inches_ok(number: Decimal) -> bool:
+    """Band plus cup strings (`32DD`) stay UK/US inch underbust values."""
+    return _in_span(number, *_UK_BRA_BAND_INCHES)
+
+
+def _bra_band_unit(region: Locale) -> SizeUnit:
+    return size_unit_for_locale(BAND_SIZE, region)
+
+
+def _bra_bare_band_ok(number: Decimal, region: Locale) -> bool:
+    """Whether a lone number is a band in ``region``'s label (feed ``source_region``)."""
+    if region in {Locale.UK, Locale.US}:
+        return _in_span(number, *_UK_BRA_BAND_INCHES)
+    if region is Locale.EU:
+        return _in_span(number, *_EU_BRA_BAND_CM)
+    if region is Locale.AU:
+        if number != number.to_integral():
+            return False
+        value = int(number)
+        low, high = _AU_BRA_BAND_DRESS
+        return low <= value <= high and value % 2 == 0
+    if region is Locale.FR:
+        low, high = _EU_BRA_BAND_CM
+        return _in_span(number, low + 15, high + 15)
+    return _in_span(number, *_UK_BRA_BAND_INCHES)
+
+
+def _bra_bare_allows_dress_unit(
+    product: ProductType | None, unit: SizeUnit, number: Decimal, *, explicit: bool
+) -> bool:
+    return (
+        not explicit
+        and product is not None
+        and product.family is ProductTypeFamily.BRAS
+        and unit.size_type is DRESS
+        and _bra_dress_number(number)
+    )
+
+
+def _parse_letter_generic(text: str) -> str | None:
+    try:
+        return Size(text, LETTER_SIZE).raw
+    except ValueError:
+        return None
+
+
+def _parse_bra_cup(text: str) -> str | None:
+    try:
+        return normalize_cup_token(text)
+    except ValueError:
+        return None
+
+
 def _cross_type_penalty(
     size_type: SizeType, raw: object, product: ProductType | None
 ) -> float:
@@ -302,6 +367,7 @@ class SizeDescription:
             self._age,
             self._waist_leg,
             self._waist_length,
+            self._bra_generic_cup,
             self._bra,
             self._shoe_width,
             self._proportion,
@@ -351,6 +417,7 @@ class SizeDescription:
             SizeDescriptionFormat.WAIST_LEG: self._write_waist_leg,
             SizeDescriptionFormat.WAIST_LENGTH: self._write_waist_length,
             SizeDescriptionFormat.BRA: self._write_bra,
+            SizeDescriptionFormat.BRA_GENERIC_CUP: self._write_bra_generic_cup,
             SizeDescriptionFormat.SHOE: self._write_shoe,
             SizeDescriptionFormat.AGE: self._write_age,
             SizeDescriptionFormat.PROPORTION: self._write_proportion,
@@ -403,6 +470,12 @@ class SizeDescription:
         found: list[tuple[int, int, float, Size]] = []
         chart_region = self._chart_locale(region)
         for unit in SIZE_UNITS:
+            if (
+                unit.size_type is SHOE_WIDTH
+                and product is not None
+                and not product.family.reads_shoe_size
+            ):
+                continue
             for entry, pattern in zip(
                 unit.recognition, unit.recognition_patterns(), strict=True
             ):
@@ -421,6 +494,16 @@ class SizeDescription:
                     if (
                         unit.size_type.family is SizeFamily.CUP_SIZE
                         and not self._cup_span_ok(text, match)
+                    ):
+                        continue
+                    if (
+                        product is not None
+                        and product.family is ProductTypeFamily.BRAS
+                        and re.fullmatch(
+                            rf"{_NUM}\s*[A-Z]{{1,3}}", text, flags=re.IGNORECASE
+                        )
+                        and unit.size_type is not BAND_SIZE
+                        and unit.size_type is not CUP_SIZE
                     ):
                         continue
                     built = self._size_from_unit(
@@ -473,7 +556,37 @@ class SizeDescription:
             and not length_value_in_range(size.raw, unit)
         ):
             return None
-        if not explicit and not unit.size_type.allows_bare_feed_value(product):
+        if (
+            not explicit
+            and not unit.size_type.allows_bare_feed_value(product)
+            and not _bra_bare_allows_dress_unit(
+                product, unit, size.raw if isinstance(size.raw, Decimal) else Decimal(0),
+                explicit=explicit,
+            )
+        ):
+            return None
+        if (
+            product is not None
+            and product.family is ProductTypeFamily.BRAS
+            and unit.size_type.family is SizeFamily.LENGTH
+            and not explicit
+        ):
+            return None
+        if (
+            unit.size_type is BAND_SIZE
+            and product is not None
+            and product.family is ProductTypeFamily.BRAS
+            and isinstance(size.raw, Decimal)
+            and not _bra_bare_band_ok(size.raw, region)
+        ):
+            return None
+        if (
+            unit.size_type is DRESS
+            and product is not None
+            and product.family is ProductTypeFamily.BRAS
+            and isinstance(size.raw, Decimal)
+            and not _bra_dress_number(size.raw)
+        ):
             return None
         if unit.size_type is CUP_RANGE and (
             product is None or product.family is not ProductTypeFamily.BRAS
@@ -502,6 +615,14 @@ class SizeDescription:
         score += _cross_type_penalty(unit.size_type, size.raw, product)
         if unit.locale is chart_region or unit.locale is region:
             score += _LOCALE_BONUS
+        if (
+            not explicit
+            and unit.size_type is BAND_SIZE
+            and product is not None
+            and product.family is ProductTypeFamily.BRAS
+            and unit.slug == _bra_band_unit(region).slug
+        ):
+            score += _BRA_BAND_REGION_BONUS
         return size, score
 
     def _cup_span_ok(self, text: str, match: re.Match[str]) -> bool:
@@ -637,23 +758,20 @@ class SizeDescription:
                 (Size(number, self._shoe_unit(locale)),),
                 score,
             )
-        if (
-            product is not None
-            and product.family is ProductTypeFamily.BRAS
-            and locale is Locale.UK
-        ):
+        if product is not None and product.family is ProductTypeFamily.BRAS:
+            if _bra_bare_band_ok(number, locale):
+                return _Hit(
+                    SizeDescriptionFormat.REGIONAL_NUMBER,
+                    (Size(number, _bra_band_unit(locale)),),
+                    0.92,
+                )
             if _bra_dress_number(number):
                 return _Hit(
                     SizeDescriptionFormat.REGIONAL_NUMBER,
-                    (Size(number, UK_DRESS_SIZE),),
+                    (self._dress_size(number, locale),),
                     0.92,
                 )
-            if _in_span(number, *_UK_BRA_BAND_INCHES):
-                return _Hit(
-                    SizeDescriptionFormat.REGIONAL_NUMBER,
-                    (Size(number, UK_BAND_SIZE),),
-                    0.85,
-                )
+            return None
         if product is None or product.family.reads_dress_size:
             score = (
                 0.92 if product is not None and product.family.reads_dress_size else 0.75
@@ -703,10 +821,16 @@ class SizeDescription:
             )
             return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, unit),), 0.62)
         if product is not None and product.family is ProductTypeFamily.BRAS:
+            if _bra_bare_band_ok(number, region):
+                return _Hit(
+                    SizeDescriptionFormat.BARE_NUMBER,
+                    (Size(number, _bra_band_unit(region)),),
+                    0.94,
+                )
             if _bra_dress_number(number):
                 return _Hit(
                     SizeDescriptionFormat.BARE_NUMBER,
-                    (Size(number, UK_DRESS_SIZE),),
+                    (self._dress_size(number, region),),
                     0.9,
                 )
             return None
@@ -717,6 +841,27 @@ class SizeDescription:
                 0.7 if product is not None and product.family.reads_dress_size else 0.45,
             )
         return None
+
+    def _bra_generic_cup(
+        self, text: str, region: Locale, product: ProductType | None
+    ) -> _Hit | None:
+        if not _bra_generic_cup_product(product):
+            return None
+        match = re.fullmatch(
+            rf"(?P<generic>.+?)\s+(?P<cup>{_CUP_LETTER})",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if match is None:
+            return None
+        generic = _parse_letter_generic(match.group("generic"))
+        cup = _parse_bra_cup(match.group("cup"))
+        if generic is None or cup is None:
+            return None
+        if cup in {"S", "R", "L"} and len(cup) == 1:
+            return None
+        sizes = (Size(generic, LETTER_SIZE), Size(cup, UK_CUP_SIZE))
+        return _Hit(SizeDescriptionFormat.BRA_GENERIC_CUP, sizes, 1.05)
 
     def _bra(
         self, text: str, region: Locale, product: ProductType | None
@@ -740,12 +885,12 @@ class SizeDescription:
             return _Hit(
                 SizeDescriptionFormat.BRA,
                 (Size(band, UK_DRESS_SIZE), Size(cup, UK_CUP_SIZE)),
-                0.95,
+                1.08,
             )
-        if not _in_span(band, *_UK_BRA_BAND_INCHES):
+        if not _bra_feed_band_inches_ok(band):
             return None
         if on_bra:
-            score = 0.95
+            score = 1.08
         elif product is None:
             score = 0.8
         else:
@@ -1046,6 +1191,12 @@ class SizeDescription:
         if BAND_SIZE in found_types and CUP_SIZE in found_types:
             found.append(SizeDescriptionFormat.BRA)
         if (
+            LETTER in found_types
+            and CUP_SIZE in found_types
+            and _bra_generic_cup_product(product)
+        ):
+            found.append(SizeDescriptionFormat.BRA_GENERIC_CUP)
+        if (
             product is not None
             and product.family.reads_shoe_size
             and (ADULT_SHOE in found_types or SHOE_WIDTH in found_types)
@@ -1112,6 +1263,14 @@ class SizeDescription:
         cup = next(size for size in sizes if size.size_type is CUP_SIZE)
         band_text = format_raw(band.raw) if isinstance(band.raw, Decimal) else band.raw
         return f"{band_text}{cup.display()}", (band, cup), ()
+
+    def _write_bra_generic_cup(
+        self, sizes: tuple[Size, ...], region: Locale, source: Locale
+    ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
+        generic = next(size for size in sizes if size.size_type is LETTER)
+        cup = next(size for size in sizes if size.size_type is CUP_SIZE)
+        generic_text = generic.size_type.label_text(str(generic.raw), region)
+        return f"{generic_text} {cup.display()}", (generic, cup), ()
 
     def _write_shoe(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale

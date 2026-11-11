@@ -260,6 +260,12 @@ def normalize_cup_token(value: object) -> str:
     token = text.upper().replace(" ", "")
     if token in CUP_TOKENS:
         return token
+    range_match = re.fullmatch(r"([A-Z]{1,3})-([A-Z]{1,3})", token)
+    if range_match is not None:
+        low = range_match.group(1)
+        high = range_match.group(2)
+        if low in CUP_TOKENS and high in CUP_TOKENS:
+            return f"{low}-{high}"
     raise ValueError(f"Unknown cup size {value!r}.")
 
 
