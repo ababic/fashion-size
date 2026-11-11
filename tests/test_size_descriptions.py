@@ -331,6 +331,61 @@ def test_bra_strings(raw, product, expected):
 
 
 @pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("4", [("uk-dress-size", "4")]),
+        ("8", [("uk-dress-size", "8")]),
+        ("10", [("uk-dress-size", "10")]),
+        ("24", [("uk-dress-size", "24")]),
+        ("UK 12", [("uk-dress-size", "12")]),
+        ("28", [("uk-band-size", "28")]),
+        ("30", [("uk-band-size", "30")]),
+        ("32", [("uk-band-size", "32")]),
+        ("46", [("uk-band-size", "46")]),
+        ("56", [("uk-band-size", "56")]),
+        ("32C", [("uk-band-size", "32"), ("uk-cup-size", "C")]),
+        ("12C", [("uk-dress-size", "12"), ("uk-cup-size", "C")]),
+        ("12 C", [("uk-dress-size", "12"), ("uk-cup-size", "C")]),
+        ("A-C", [("cup-range", "A-C")]),
+        ("D-E", [("cup-range", "D-E")]),
+        ("F-G", [("cup-range", "F-G")]),
+        ("GG-H", [("cup-range", "GG-H")]),
+        ("10 A-C", [("uk-dress-size", "10"), ("cup-range", "A-C")]),
+        ("10A-C", [("uk-dress-size", "10"), ("cup-range", "A-C")]),
+        ("22 D-E", [("uk-dress-size", "22"), ("cup-range", "D-E")]),
+        ("C", [("uk-cup-size", "C")]),
+    ],
+)
+def test_bra_dress_size_and_cup_range(raw, expected):
+    decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.BRAS)
+    assert _ids(decoded) == expected
+    if any(slug in {"uk-dress-size", "cup-range"} for slug, _value in expected):
+        assert decoded.confidence >= 0.9
+    for size in decoded.sizes:
+        if size.size_unit.slug == "cup-range":
+            assert size.size_type.family.value == "label"
+
+
+def test_bra_dress_reading_does_not_apply_to_other_families():
+    for product in (
+        ProductType.DRESSES,
+        ProductType.SKIRTS,
+        ProductType.NIGHTWEAR,
+        ProductType.SWIMWEAR,
+    ):
+        dress = decode_size_description("10", Locale.UK, product_type=product)
+        assert _ids(dress) == [("uk-dress-size", "10")]
+        larger = decode_size_description("30", Locale.UK, product_type=product)
+        assert _ids(larger) == [("uk-dress-size", "30")]
+        ranged = decode_size_description("A-C", Locale.UK, product_type=product)
+        assert "cup-range" not in [size.size_unit.slug for size in ranged.sizes]
+
+    top = decode_size_description("10", Locale.UK, product_type=ProductType.CASUAL_TOPS)
+    assert "uk-dress-size" not in [size.size_unit.slug for size in top.sizes]
+    assert "uk-band-size" not in [size.size_unit.slug for size in top.sizes]
+
+
+@pytest.mark.parametrize(
     ("raw", "slug", "token", "display"),
     [
         ("5-6 years", "age-years", "5-6", "5-6 years"),

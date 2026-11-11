@@ -31,6 +31,8 @@ from fashion_size.types import (
     CHEST_SIZE,
     CM_COLLAR_SIZE,
     CM_WAIST_SIZE,
+    CUP_RANGE,
+    CUP_RANGE_SIZE,
     CUP_SIZE,
     CUP_TOKENS,
     DRESS,
@@ -50,6 +52,7 @@ from fashion_size.types import (
     TROUSERS_INSEAM,
     UK_BAND_SIZE,
     UK_CUP_SIZE,
+    UK_DRESS_SIZE,
     WAIST,
     WAIST_SIZE,
     LengthOutOfRangeError,
@@ -82,6 +85,11 @@ _AMBIGUITY_PENALTY = 0.45
 # Feed conventions, tighter than the size type's own inch range.
 _FEED_WAIST_INCHES = (24, 50)
 _UK_BRA_BAND_INCHES = (28, 56)
+# Even UK dress labels Marks & Spencer prints on a bra. 26 and 28–32 stay off
+# this list: 28 and above are bands, and 26 is not one of these dress lines.
+_BRA_DRESS_LOW = 4
+_BRA_DRESS_HIGH = 24
+_CUP_RANGE_TEXT = r"GG\s*[-–]\s*H|A\s*[-–]\s*C|D\s*[-–]\s*E|F\s*[-–]\s*G"
 
 # Context that looks like a size token but is a quantity, a year, a collection
 # name, or a garment phrase. A recognition match inside one of these is not a size.
@@ -248,6 +256,21 @@ def _number(text: str) -> Decimal:
     return normalize_raw(text)
 
 
+def _bra_dress_number(number: Decimal) -> bool:
+    """Even UK dress size printed on a bra, from 4 through 24."""
+    if number != number.to_integral_value():
+        return False
+    value = int(number)
+    return _BRA_DRESS_LOW <= value <= _BRA_DRESS_HIGH and value % 2 == 0
+
+
+def _as_number(raw: str) -> Decimal | None:
+    try:
+        return _number(raw)
+    except (InvalidOperation, ValueError):
+        return None
+
+
 class SizeDescription:
     """Read one feed string, and join size values back into one string.
 
@@ -371,6 +394,12 @@ class SizeDescription:
         self, text: str, region: Locale, product: ProductType | None
     ) -> _Hit | None:
         """Find size values by each unit's own recognition patterns."""
+        if (
+            product is not None
+            and product.family is ProductTypeFamily.BRAS
+            and self._bra(text, region, product) is not None
+        ):
+            return None
         found: list[tuple[int, int, float, Size]] = []
         chart_region = self._chart_locale(region)
         for unit in SIZE_UNITS:
@@ -446,6 +475,20 @@ class SizeDescription:
             return None
         if not explicit and not unit.size_type.allows_bare_feed_value(product):
             return None
+        if unit.size_type is CUP_RANGE and (
+            product is None or product.family is not ProductTypeFamily.BRAS
+        ):
+            return None
+        if product is not None and product.family is ProductTypeFamily.BRAS:
+            number = _as_number(raw)
+            if number is not None and unit.size_type is BAND_SIZE and _bra_dress_number(
+                number
+            ):
+                return None
+            if number is not None and unit.size_type is DRESS and not _bra_dress_number(
+                number
+            ):
+                return None
         # Dress, skirt, nightwear, and swimwear sizes are dress sizes. A cup
         # letter on that number is not a second size.
         if (
@@ -594,6 +637,23 @@ class SizeDescription:
                 (Size(number, self._shoe_unit(locale)),),
                 score,
             )
+        if (
+            product is not None
+            and product.family is ProductTypeFamily.BRAS
+            and locale is Locale.UK
+        ):
+            if _bra_dress_number(number):
+                return _Hit(
+                    SizeDescriptionFormat.REGIONAL_NUMBER,
+                    (Size(number, UK_DRESS_SIZE),),
+                    0.92,
+                )
+            if _in_span(number, *_UK_BRA_BAND_INCHES):
+                return _Hit(
+                    SizeDescriptionFormat.REGIONAL_NUMBER,
+                    (Size(number, UK_BAND_SIZE),),
+                    0.85,
+                )
         if product is None or product.family.reads_dress_size:
             score = (
                 0.92 if product is not None and product.family.reads_dress_size else 0.75
@@ -642,6 +702,14 @@ class SizeDescription:
                 else CM_WAIST_SIZE
             )
             return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, unit),), 0.62)
+        if product is not None and product.family is ProductTypeFamily.BRAS:
+            if _bra_dress_number(number):
+                return _Hit(
+                    SizeDescriptionFormat.BARE_NUMBER,
+                    (Size(number, UK_DRESS_SIZE),),
+                    0.9,
+                )
+            return None
         if product is None or product.family.reads_dress_size:
             return _Hit(
                 SizeDescriptionFormat.BARE_NUMBER,
@@ -653,6 +721,11 @@ class SizeDescription:
     def _bra(
         self, text: str, region: Locale, product: ProductType | None
     ) -> _Hit | None:
+        on_bra = product is not None and product.family is ProductTypeFamily.BRAS
+        if on_bra:
+            ranged = self._bra_cup_range(text)
+            if ranged is not None:
+                return ranged
         match = re.fullmatch(rf"({_NUM})\s*([A-Z]{{1,3}})", text, flags=re.IGNORECASE)
         if match is None:
             return None
@@ -663,9 +736,15 @@ class SizeDescription:
         if cup not in CUP_TOKENS or cup in {"S", "R", "L"}:
             return None
         band = _number(match.group(1))
+        if on_bra and _bra_dress_number(band):
+            return _Hit(
+                SizeDescriptionFormat.BRA,
+                (Size(band, UK_DRESS_SIZE), Size(cup, UK_CUP_SIZE)),
+                0.95,
+            )
         if not _in_span(band, *_UK_BRA_BAND_INCHES):
             return None
-        if product is not None and product.family is ProductTypeFamily.BRAS:
+        if on_bra:
             score = 0.95
         elif product is None:
             score = 0.8
@@ -677,6 +756,28 @@ class SizeDescription:
             (Size(band, UK_BAND_SIZE), Size(cup, UK_CUP_SIZE)),
             score,
         )
+
+    def _bra_cup_range(self, text: str) -> _Hit | None:
+        """``A-C`` alone, or a dress size or band written next to that span."""
+        alone = re.fullmatch(_CUP_RANGE_TEXT, text, flags=re.IGNORECASE)
+        paired = re.fullmatch(
+            rf"({_NUM})\s*({_CUP_RANGE_TEXT})", text, flags=re.IGNORECASE
+        )
+        if alone is not None:
+            return _Hit(
+                SizeDescriptionFormat.BRA, (Size(alone.group(0), CUP_RANGE_SIZE),), 0.93
+            )
+        if paired is None:
+            return None
+        cup_range = Size(paired.group(2), CUP_RANGE_SIZE)
+        number = _number(paired.group(1))
+        if _bra_dress_number(number):
+            measured: Size = Size(number, UK_DRESS_SIZE)
+        elif _in_span(number, *_UK_BRA_BAND_INCHES):
+            measured = Size(number, UK_BAND_SIZE)
+        else:
+            return None
+        return _Hit(SizeDescriptionFormat.BRA, (measured, cup_range), 0.95)
 
     def _waist_leg(
         self, text: str, region: Locale, product: ProductType | None
