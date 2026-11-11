@@ -871,6 +871,67 @@ def test_bra_band_stays_a_uk_inch_band():
     assert [size.size_unit for size in decoded.sizes] == [UK_BAND_SIZE, UK_CUP_SIZE]
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("32", [("uk-band-size", "32")]),
+        ("10", [("uk-dress-size", "10")]),
+        ("UK 32", [("uk-band-size", "32")]),
+        ("UK 10", [("uk-dress-size", "10")]),
+    ],
+)
+def test_bra_bare_number_is_band_or_even_dress(raw, expected):
+    decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.BRAS)
+    assert _ids(decoded) == expected
+
+
+def test_bra_bare_band_uses_source_region():
+    uk = decode_size_description("32", Locale.UK, product_type=ProductType.BRAS)
+    assert uk.sizes[0].size_unit.slug == "uk-band-size"
+    eu = decode_size_description("75", Locale.EU, product_type=ProductType.BRAS)
+    assert eu.sizes[0].size_unit.slug == "eu-band-size"
+    assert eu.sizes[0].raw == 75
+    fr = decode_size_description("90", Locale.FR, product_type=ProductType.BRAS)
+    assert fr.sizes[0].size_unit.slug == "fr-band-size"
+    assert decode_size_description("32", Locale.EU, product_type=ProductType.BRAS).sizes == ()
+    eu_dress = decode_size_description("10", Locale.EU, product_type=ProductType.BRAS)
+    assert _ids(eu_dress) == [("uk-dress-size", "10")]
+
+
+@pytest.mark.parametrize(
+    ("raw", "product", "expected"),
+    [
+        ("M C", ProductType.BRAS, [("letter", "M"), ("uk-cup-size", "C")]),
+        (
+            "Medium A-C",
+            ProductType.BRAS,
+            [("letter", "M"), ("cup-range", "A-C")],
+        ),
+        (
+            "Medium A-C",
+            ProductType.SWIMWEAR,
+            [("letter", "M"), ("cup-range", "A-C")],
+        ),
+    ],
+)
+def test_bra_generic_size_with_cup(raw, product, expected):
+    decoded = decode_size_description(raw, Locale.UK, product_type=product)
+    assert decoded.format_id == "bra-generic-cup"
+    assert _ids(decoded) == expected
+
+
+def test_even_dress_numbers_on_bras_are_not_bands():
+    for value in (4, 12, 24):
+        decoded = decode_size_description(
+            str(value), Locale.UK, product_type=ProductType.BRAS
+        )
+        assert decoded.sizes[0].size_type.slug == "dress"
+        assert decoded.sizes[0].raw == value
+    decoded = decode_size_description("30", Locale.UK, product_type=ProductType.BRAS)
+    assert decoded.sizes[0].size_type.slug == "band-size"
+    assert decoded.sizes[0].raw == 30
+
+
 def test_encode_discards_a_length_outside_the_target_range():
     encoded = encode_size_description(
         [Size(30, CM_WAIST_SIZE)],

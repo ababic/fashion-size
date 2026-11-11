@@ -99,7 +99,7 @@ from fashion_size.types import (
 
 
 def test_version_is_the_current_release():
-    assert __version__ == "2026.11.11"
+    assert __version__ == "2026.11.11.1"
 
 
 def test_readme_brand_chart_example():
