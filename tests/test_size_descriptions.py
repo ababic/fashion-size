@@ -894,6 +894,8 @@ def test_bra_bare_band_uses_source_region():
     fr = decode_size_description("90", Locale.FR, product_type=ProductType.BRAS)
     assert fr.sizes[0].size_unit.slug == "fr-band-size"
     assert decode_size_description("32", Locale.EU, product_type=ProductType.BRAS).sizes == ()
+    eu_dress = decode_size_description("10", Locale.EU, product_type=ProductType.BRAS)
+    assert _ids(eu_dress) == [("uk-dress-size", "10")]
 
 
 @pytest.mark.parametrize(
@@ -903,12 +905,12 @@ def test_bra_bare_band_uses_source_region():
         (
             "Medium A-C",
             ProductType.BRAS,
-            [("letter", "M"), ("uk-cup-size", "A-C")],
+            [("letter", "M"), ("cup-range", "A-C")],
         ),
         (
             "Medium A-C",
             ProductType.SWIMWEAR,
-            [("letter", "M"), ("uk-cup-size", "A-C")],
+            [("letter", "M"), ("cup-range", "A-C")],
         ),
     ],
 )

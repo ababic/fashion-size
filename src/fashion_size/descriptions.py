@@ -95,7 +95,6 @@ _EU_BRA_BAND_CM = (60, 130)
 _AU_BRA_BAND_DRESS = (6, 34)
 _BRA_BAND_REGION_BONUS = 0.28
 _CUP_RANGE_TEXT = r"GG\s*[-–]\s*H|A\s*[-–]\s*C|D\s*[-–]\s*E|F\s*[-–]\s*G"
-_CUP_LETTER = r"[A-Z]{1,3}(?:-[A-Z]{1,3})?"
 
 # Context that looks like a size token but is a quantity, a year, a collection
 # name, or a garment phrase. A recognition match inside one of these is not a size.
@@ -269,9 +268,14 @@ def _bra_bare_allows_dress_unit(
         not explicit
         and product is not None
         and product.family is ProductTypeFamily.BRAS
-        and unit.size_type is DRESS
+        and unit.slug == UK_DRESS_SIZE.slug
         and _bra_dress_number(number)
     )
+
+
+def _bra_uk_dress_size(number: Decimal) -> Size:
+    """Marks & Spencer dress-size lines on a bra are always UK dress labels."""
+    return Size(number, UK_DRESS_SIZE)
 
 
 def _parse_letter_generic(text: str) -> str | None:
@@ -584,10 +588,11 @@ class SizeDescription:
             unit.size_type is DRESS
             and product is not None
             and product.family is ProductTypeFamily.BRAS
-            and isinstance(size.raw, Decimal)
-            and not _bra_dress_number(size.raw)
         ):
-            return None
+            if unit.slug != UK_DRESS_SIZE.slug:
+                return None
+            if isinstance(size.raw, Decimal) and not _bra_dress_number(size.raw):
+                return None
         if unit.size_type is CUP_RANGE and (
             product is None or product.family is not ProductTypeFamily.BRAS
         ):
@@ -768,7 +773,7 @@ class SizeDescription:
             if _bra_dress_number(number):
                 return _Hit(
                     SizeDescriptionFormat.REGIONAL_NUMBER,
-                    (self._dress_size(number, locale),),
+                    (_bra_uk_dress_size(number),),
                     0.92,
                 )
             return None
@@ -830,7 +835,7 @@ class SizeDescription:
             if _bra_dress_number(number):
                 return _Hit(
                     SizeDescriptionFormat.BARE_NUMBER,
-                    (self._dress_size(number, region),),
+                    (_bra_uk_dress_size(number),),
                     0.9,
                 )
             return None
@@ -847,8 +852,23 @@ class SizeDescription:
     ) -> _Hit | None:
         if not _bra_generic_cup_product(product):
             return None
+        range_match = re.fullmatch(
+            rf"(?P<generic>.+?)\s+(?P<cup>{_CUP_RANGE_TEXT})",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if range_match is not None:
+            generic = _parse_letter_generic(range_match.group("generic"))
+            if generic is None:
+                return None
+            cup = Size(range_match.group("cup"), CUP_RANGE_SIZE)
+            return _Hit(
+                SizeDescriptionFormat.BRA_GENERIC_CUP,
+                (Size(generic, LETTER_SIZE), cup),
+                1.05,
+            )
         match = re.fullmatch(
-            rf"(?P<generic>.+?)\s+(?P<cup>{_CUP_LETTER})",
+            r"(?P<generic>.+?)\s+(?P<cup>[A-Z]{1,3})",
             text,
             flags=re.IGNORECASE,
         )
@@ -1192,7 +1212,7 @@ class SizeDescription:
             found.append(SizeDescriptionFormat.BRA)
         if (
             LETTER in found_types
-            and CUP_SIZE in found_types
+            and (CUP_SIZE in found_types or CUP_RANGE in found_types)
             and _bra_generic_cup_product(product)
         ):
             found.append(SizeDescriptionFormat.BRA_GENERIC_CUP)
@@ -1268,9 +1288,17 @@ class SizeDescription:
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
         generic = next(size for size in sizes if size.size_type is LETTER)
-        cup = next(size for size in sizes if size.size_type is CUP_SIZE)
+        cup = next(
+            size
+            for size in sizes
+            if size.size_type in {CUP_SIZE, CUP_RANGE}
+        )
         generic_text = generic.size_type.label_text(str(generic.raw), region)
-        return f"{generic_text} {cup.display()}", (generic, cup), ()
+        if cup.size_type is CUP_RANGE:
+            cup_text = cup.size_type.label_text(str(cup.raw), region)
+        else:
+            cup_text = cup.display()
+        return f"{generic_text} {cup_text}", (generic, cup), ()
 
     def _write_shoe(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
