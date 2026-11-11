@@ -15,6 +15,7 @@ class SizeTypeSlug(StrEnum):
     KIDS_SHOE = "kids-shoe"
     BABY_SHOE = "baby-shoe"
     CUP_SIZE = "cup-size"
+    CUP_RANGE = "cup-range"
     BAND_SIZE = "band-size"
     WAIST_SIZE = "waist-size"
     CHEST_SIZE = "chest-size"

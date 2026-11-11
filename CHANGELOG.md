@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- On a bra, a bare even number from 4 to 24 is a UK dress size. A number from 28 to 56 stays a UK band, so `30` and `32` are bands and `32C` is still band 32 and cup C. A cup span (`A-C`, `D-E`, `F-G`, `GG-H`) is a `cup-range` label and is not converted. Dresses, skirts, and tops are unchanged.
+
 ## 2026.10.22
 
 - ``CHART_AGE_COVERAGE`` documents which catalogue age groups each size type's charts may serve. Brand ``chart_for`` lookup uses the same age fallbacks as default scales: a ``kids-shoe`` override stored under ``child`` also applies to baby-labelled products when no baby chart exists.

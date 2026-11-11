@@ -741,6 +741,31 @@ CUP_SIZE = SizeType(
     ("cup-size", "bra-cup", "bra-cup-size"),
     affinity=frozenset({ProductType.BRAS}),
 )
+# A feed span such as ``A-C``. It is text, not a letter on the cup chart.
+_CUP_RANGE_VALUE = r"GG\s*[-–]\s*H|GG\s+H|A\s*[-–]\s*C|A\s+C|D\s*[-–]\s*E|D\s+E|F\s*[-–]\s*G|F\s+G"
+CUP_RANGE_VOCABULARY = label_vocabulary(
+    display={
+        "A-C": "A-C",
+        "D-E": "D-E",
+        "F-G": "F-G",
+        "GG-H": "GG-H",
+    },
+    aliases={
+        "a c": "A-C",
+        "d e": "D-E",
+        "f g": "F-G",
+        "gg h": "GG-H",
+    },
+    patterns=(rf"(?<![A-Za-z])(?P<value>{_CUP_RANGE_VALUE})(?![A-Za-z])",),
+)
+CUP_RANGE = SizeType(
+    SizeTypeSlug.CUP_RANGE,
+    SizeFamily.LABEL,
+    "Cup range",
+    ("cup-range",),
+    affinity=frozenset({ProductType.BRAS}),
+    vocabulary=CUP_RANGE_VOCABULARY,
+)
 # Underbust band. Distinct from chest size (a jacket label) and from cup size.
 BAND_SIZE = SizeType(
     SizeTypeSlug.BAND_SIZE,
@@ -1137,6 +1162,7 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     AGE_MONTHS,
     AGE_YEARS,
     LETTER,
+    CUP_RANGE,
 )
 SIZE_TYPE_BY_SLUG: dict[str, SizeType] = {
     size_type.slug: size_type for size_type in SIZE_TYPES
@@ -1534,6 +1560,7 @@ PROPORTION_SIZE = _label_size_unit(PROPORTION)
 AGE_MONTHS_SIZE = _label_size_unit(AGE_MONTHS)
 AGE_YEARS_SIZE = _label_size_unit(AGE_YEARS)
 LETTER_SIZE = _label_size_unit(LETTER)
+CUP_RANGE_SIZE = _label_size_unit(CUP_RANGE)
 
 def label_display(size_type: SizeType, token: str) -> str:
     """English label for a canonical label-size token, including age bands."""
@@ -1600,6 +1627,7 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     AGE_MONTHS_SIZE,
     AGE_YEARS_SIZE,
     LETTER_SIZE,
+    CUP_RANGE_SIZE,
 )
 SIZE_UNIT_BY_SLUG: dict[str, SizeUnit] = {
     size_unit.slug: size_unit for size_unit in SIZE_UNITS
