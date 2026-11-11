@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2026.11.11.1
+
 - Bra feed decoding: a bare band with no cup uses the feed `source_region` (UK/US inch 28–56, EU cm 60–130, FR EU+15, AU dress-style 6–34 even). Otherwise an even UK dress size (4–24) applies on bras. Generic plus cup strings (`M C`, `Medium A-C`) decode as letter and cup on bras and swimwear. Shoe-width patterns no longer match on non-footwear products.
 
 ## 2026.11.11
