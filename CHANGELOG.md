@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2026.11.12.2
+
+- `trousers-inseam` minimum lowered to **17 in** (was 22 in in 2026.11.12.1) for cropped leggings and short-leg trousers. Overlap with `shorts-inseam` (2–24 in) is now **17–24 in**; product type still disambiguates. Values below 17 in remain invalid on trousers inseam (not extended toward dress-size mis-mappings).
+
 ## 2026.11.12.1
 
 - Garment inseam inch bounds: `shorts-inseam` 2–24 (was 2–22), `trousers-inseam` 22–42 (was 24–42). The 22–24 in band overlaps so long shorts/bermudas and cropped/petite trouser legs validate on the right schema; product type disambiguates. Generic `inside-leg` remains 2–42 in.
