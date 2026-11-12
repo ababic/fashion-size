@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Feed decoding: a number with no region marker is read in `source_region` only when it is on that region's default chart for the size type. Otherwise it takes the one other region whose chart has it (`39` on a UK shoe is `EU 39`, `62` on a UK waist is `EU 62`, `70` on a UK bra is an EU band). A number on several other charts, or none, is not returned as a chart size. Prefixed numbers, letters, cups, and lengths are unchanged. A bare number that used to be a regional dress, waist, or shoe size off the chart (for example `12` on an EU dress) now decodes to nothing.
+- Feed decoding: a number with no region marker is read in `source_region` only when it is on that region's default chart for the size type. Otherwise it takes the one other region whose chart has it (`39` on a UK shoe is `EU 39`, `62` on a UK waist is `EU 62`, `70` on a UK bra is an EU band). A number on several other charts, or none, is not returned as a chart size. Prefixed numbers, letters, cups, and lengths are unchanged. A bare number that used to be a regional dress, waist, or shoe size off the chart (for example `12` on an EU dress) now decodes to nothing. `decode_size_description` takes an optional `age_group` (`AgeGroup`, adult when omitted); kids and baby shoe sizes are only placed for `AgeGroup.CHILD` and `AgeGroup.BABY`, so a bare `28` on a UK shoe with no age group is no shoe size.
 
 ## 2026.11.11.1
 

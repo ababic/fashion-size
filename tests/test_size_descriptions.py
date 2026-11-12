@@ -4,6 +4,7 @@ import re
 
 import pytest
 
+from fashion_size.demographics import AgeGroup
 from fashion_size.descriptions import decode_size_description, encode_size_description
 from fashion_size.product_types import ProductType
 from fashion_size.types import (
@@ -973,8 +974,6 @@ def test_jeans_slash_round_trips():
         ("39", Locale.UK, ProductType.SHOES, "eu-adult-shoe-size", "39"),
         ("34", Locale.UK, ProductType.SHOES, "eu-adult-shoe-size", "34"),
         ("46", Locale.UK, ProductType.SHOES, "eu-adult-shoe-size", "46"),
-        ("28", Locale.UK, ProductType.SHOES, "eu-kids-shoe-size", "28"),
-        ("20", Locale.UK, ProductType.SHOES, "eu-baby-shoe-size", "20"),
         ("62", Locale.UK, ProductType.JEANS, "eu-waist-size", "62"),
         ("50", Locale.UK, ProductType.JEANS, "uk-waist-size", "50"),
         ("40", Locale.UK, ProductType.DRESSES, "eu-dress-size", "40"),
@@ -997,6 +996,8 @@ def test_bare_number_follows_the_chart_it_is_on(raw, region, product, slug, valu
         ("30", Locale.EU, ProductType.JEANS),
         ("12", Locale.EU, ProductType.DRESSES),
         ("100", Locale.UK, ProductType.SHOES),
+        ("28", Locale.UK, ProductType.SHOES),
+        ("20", Locale.UK, ProductType.SHOES),
     ],
 )
 def test_bare_number_on_no_chart_or_several_is_not_guessed(raw, region, product):
@@ -1004,3 +1005,30 @@ def test_bare_number_on_no_chart_or_several_is_not_guessed(raw, region, product)
     assert all(
         size.size_unit.locale is Locale.UNIVERSAL for size in decoded.sizes
     ), _ids(decoded)
+
+
+@pytest.mark.parametrize(
+    ("raw", "age_group", "slug", "value"),
+    [
+        ("28", AgeGroup.CHILD, "eu-kids-shoe-size", "28"),
+        ("36", AgeGroup.CHILD, "eu-kids-shoe-size", "36"),
+        ("10", AgeGroup.CHILD, "uk-kids-shoe-size", "10"),
+        ("20", AgeGroup.BABY, "eu-baby-shoe-size", "20"),
+        ("3", AgeGroup.BABY, "uk-baby-shoe-size", "3"),
+        ("39", AgeGroup.ADULT, "eu-adult-shoe-size", "39"),
+    ],
+)
+def test_age_group_picks_the_shoe_chart_for_a_bare_number(raw, age_group, slug, value):
+    decoded = decode_size_description(
+        raw, Locale.UK, product_type=ProductType.SHOES, age_group=age_group
+    )
+    assert _ids(decoded) == [(slug, value)]
+
+
+def test_age_group_rejects_other_charts_and_bad_types():
+    decoded = decode_size_description(
+        "39", Locale.UK, product_type=ProductType.SHOES, age_group=AgeGroup.CHILD
+    )
+    assert not any("shoe" in size.size_unit.slug for size in decoded.sizes)
+    with pytest.raises(TypeError, match="age_group"):
+        decode_size_description("8", Locale.UK, age_group="child")
