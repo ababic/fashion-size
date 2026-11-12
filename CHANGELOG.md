@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `chart_hits` lists every default chart a size token sits on, and the potential product families, age groups, and genders of those hits. A region prefix on the token keeps that region. A bare number does not assume UK or a dress size. A length token (`SHT`, `REG`, `LNG`, `PET`, `TAL`, or `S`/`R`/`L`/`T`) keeps adult dress, waist, and chest hits. A cup or cup range reads the cell as bras. A letter or a number on no chart abstains, so the other tokens on a line can still decide. `decode_size_description` is unchanged.
+
 - Feed decoding: a number with no region marker is read in `source_region` only when it is on that region's default chart for the size type. Otherwise it takes the one other region whose chart has it (`39` on a UK shoe is `EU 39`, `62` on a UK waist is `EU 62`, `70` on a UK bra is an EU band). A number on several other charts, or none, is not returned as a chart size. Prefixed numbers, letters, cups, and lengths are unchanged. A bare number that used to be a regional dress, waist, or shoe size off the chart (for example `12` on an EU dress) now decodes to nothing, including as a length. `decode_size_description` takes an optional `age_group` (`AgeGroup`, adult when omitted); kids and baby shoe sizes are only placed for `AgeGroup.CHILD` and `AgeGroup.BABY`, so a bare `28` on a UK shoe with no age group is no shoe size. A bare bra band has to be a chart row, and a French band competes only for a French feed or when no other chart has the number, so a UK `75` is an EU band while `29` and `72` are not bands. `age_group` also selects the shoe size type of a prefixed number.
 
 ## 2026.11.11.1
