@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Feed decoding: a number with no region marker is read in `source_region` only when it is on that region's default chart for the size type. Otherwise it takes the one other region whose chart has it (`39` on a UK shoe is `EU 39`, `62` on a UK waist is `EU 62`, `70` on a UK bra is an EU band). A number on several other charts, or none, is not returned as a chart size. Prefixed numbers, letters, cups, and lengths are unchanged. A bare number that used to be a regional dress, waist, or shoe size off the chart (for example `12` on an EU dress) now decodes to nothing, including as a length. `decode_size_description` takes an optional `age_group` (`AgeGroup`, adult when omitted); kids and baby shoe sizes are only placed for `AgeGroup.CHILD` and `AgeGroup.BABY`, so a bare `28` on a UK shoe with no age group is no shoe size. A bare bra band has to be a chart row, and a French band competes only for a French feed or when no other chart has the number, so a UK `75` is an EU band while `29` and `72` are not bands. `age_group` also selects the shoe size type of a prefixed number.
+
 ## 2026.11.11.1
 
 - Bra feed decoding: a bare band with no cup uses the feed `source_region` (UK/US inch 28–56, EU cm 60–130, FR EU+15, AU dress-style 6–34 even). Otherwise an even UK dress size (4–24) on a bra stays `uk-dress-size` regardless of `source_region`. Generic plus cup strings (`M C`, `Medium A-C`) decode as letter plus chart cup or `cup-range` on bras and swimwear; cup spans are not stored on `uk-cup-size`. Shoe-width patterns no longer match on non-footwear products.

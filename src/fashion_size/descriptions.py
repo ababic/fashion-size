@@ -13,20 +13,24 @@ except that length-unit change.
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
+from functools import cache
 
 from fashion_size.demographics import AgeGroup, Demographic, Gender
 from fashion_size.product_types import ProductType, ProductTypeFamily
+from fashion_size.scales import default_scale
 from fashion_size.types import (
     ADULT_SHOE,
     AGE_MONTHS,
     AGE_MONTHS_SIZE,
     AGE_YEARS,
     AGE_YEARS_SIZE,
+    BABY_SHOE,
     BAND_SIZE,
     CHEST_SIZE,
     CM_COLLAR_SIZE,
@@ -40,6 +44,7 @@ from fashion_size.types import (
     INCH_SLEEVE_SIZE,
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
+    KIDS_SHOE,
     LETTER,
     LETTER_SIZE,
     PROPORTION,
@@ -58,6 +63,7 @@ from fashion_size.types import (
     WAIST_SIZE,
     LengthOutOfRangeError,
     Locale,
+    MissingScaleError,
     Size,
     SizeFamily,
     SizeType,
@@ -261,6 +267,100 @@ def _bra_bare_band_ok(number: Decimal, region: Locale) -> bool:
     return _in_span(number, *_UK_BRA_BAND_INCHES)
 
 
+# Chart-labelled size types whose unprefixed numbers are placed by chart membership,
+# per age group. Kids and baby charts are only consulted when the caller names them.
+_BARE_SIZE_TYPES: dict[AgeGroup, tuple[SizeType, ...]] = {
+    AgeGroup.ADULT: (DRESS, ADULT_SHOE, WAIST_SIZE, CHEST_SIZE),
+    AgeGroup.CHILD: (DRESS, KIDS_SHOE, WAIST_SIZE, CHEST_SIZE),
+    AgeGroup.BABY: (BABY_SHOE,),
+}
+_SHOE_BY_AGE_GROUP: dict[AgeGroup, SizeType] = {
+    AgeGroup.ADULT: ADULT_SHOE,
+    AgeGroup.CHILD: KIDS_SHOE,
+    AgeGroup.BABY: BABY_SHOE,
+}
+_BARE_REGIONS = (Locale.UK, Locale.EU, Locale.US, Locale.AU)
+_ALL_BARE_SIZE_TYPES = frozenset(
+    t for types in _BARE_SIZE_TYPES.values() for t in types
+)
+
+
+@cache
+def _chart_numbers(
+    size_type: SizeType, locale: Locale, age_group: AgeGroup, *, womens: bool
+) -> frozenset[Decimal]:
+    """Every number a default chart for ``size_type`` prints in ``locale``.
+
+    ``womens`` limits an adult chart to the women's rows (a dress product).
+    """
+    if age_group is AgeGroup.ADULT:
+        genders = (Gender.FEMALE,) if womens else (Gender.MALE, Gender.FEMALE)
+    else:
+        genders = (Gender.UNISEX,)
+    numbers: set[Decimal] = set()
+    for gender in genders:
+        try:
+            scale = default_scale(size_type, age_group, gender)
+        except MissingScaleError:
+            continue
+        numbers.update(
+            normalize_raw(value)
+            for value in scale.raw_values(size_unit_for_locale(size_type, locale))
+        )
+    return frozenset(numbers)
+
+
+def _bare_locale(
+    size_type: SizeType,
+    number: Decimal,
+    region: Locale,
+    age_group: AgeGroup,
+    product: ProductType | None = None,
+) -> Locale | None:
+    """Region an unprefixed number belongs to, or ``None`` when it is not one size.
+
+    The feed region wins when the number is on its chart. Otherwise the number
+    is placed only if exactly one other region's chart has it.
+    """
+    if size_type is BAND_SIZE:
+        if age_group is not AgeGroup.ADULT:
+            return None
+        # French bands are the EU chart plus 15, so they overlap it. They compete
+        # only for a French feed, or when no other chart has the number.
+        on_chart = [
+            loc
+            for loc in (Locale.UK, Locale.US, Locale.EU, Locale.AU)
+            if number in _chart_numbers(size_type, loc, age_group, womens=False)
+        ]
+        on_french = number in _chart_numbers(
+            size_type, Locale.FR, age_group, womens=False
+        )
+        if region is Locale.FR and on_french:
+            return Locale.FR
+        if region not in on_chart and _bra_dress_number(number):
+            return None
+        if region in on_chart:
+            return region
+        if len(on_chart) == 1:
+            return on_chart[0]
+        if not on_chart and on_french:
+            return Locale.FR
+        return None
+    else:
+        if size_type not in _BARE_SIZE_TYPES[age_group]:
+            return None
+        region = Locale.EU if region is Locale.FR else region
+        womens = product is not None and product.family.reads_dress_size
+        on_chart = [
+            loc
+            for loc in _BARE_REGIONS
+            if number in _chart_numbers(size_type, loc, age_group, womens=womens)
+        ]
+    if region in on_chart:
+        return region
+    return on_chart[0] if len(on_chart) == 1 else None
+
+
 def _bra_bare_allows_dress_unit(
     product: ProductType | None, unit: SizeUnit, number: Decimal, *, explicit: bool
 ) -> bool:
@@ -348,14 +448,23 @@ class SizeDescription:
     wording.
     """
 
+    _age_group: AgeGroup = AgeGroup.ADULT
+
     def decode(
         self,
         value: str,
         source_region: Locale,
         product_type: ProductType | None = None,
+        age_group: AgeGroup | None = None,
     ) -> DecodedSizeDescription:
         region = _require_locale(source_region, name="source_region")
         product = _require_product_type(product_type)
+        if age_group is not None and not isinstance(age_group, AgeGroup):
+            raise TypeError(
+                f"age_group must be an AgeGroup, not {type(age_group).__name__}."
+            )
+        scoped = copy.copy(self)
+        scoped._age_group = age_group or AgeGroup.ADULT
         text = " ".join((value or "").strip().split())
         if _PURE_RANGE.fullmatch(text):
             return DecodedSizeDescription(
@@ -364,23 +473,25 @@ class SizeDescription:
         if not text:
             return DecodedSizeDescription((), None, 0.0, (), ())
         readers = (
-            self._regions,
-            self._numbered_fit,
-            self._collar_sleeve,
-            self._from_units,
-            self._age,
-            self._waist_leg,
-            self._waist_length,
-            self._bra_generic_cup,
-            self._bra,
-            self._shoe_width,
-            self._proportion,
-            self._length_word,
-            self._region_number,
-            self._bare_number,
+            scoped._regions,
+            scoped._numbered_fit,
+            scoped._collar_sleeve,
+            scoped._from_units,
+            scoped._age,
+            scoped._waist_leg,
+            scoped._waist_length,
+            scoped._bra_generic_cup,
+            scoped._bra,
+            scoped._shoe_width,
+            scoped._proportion,
+            scoped._length_word,
+            scoped._region_number,
+            scoped._bare_number,
         )
         hits = [
-            hit for reader in readers if (hit := reader(text, region, product)) is not None
+            hit
+            for reader in readers
+            if (hit := reader(text, region, product)) is not None
         ]
         if not hits:
             return DecodedSizeDescription(
@@ -548,7 +659,39 @@ class SizeDescription:
         product: ProductType | None,
         explicit: bool,
     ) -> tuple[Size, float] | None:
-        if not explicit and unit.locale not in {Locale.UNIVERSAL, chart_region, region}:
+        if unit.size_type in _SHOE_BY_AGE_GROUP.values() and (
+            unit.size_type is not _SHOE_BY_AGE_GROUP[self._age_group]
+        ):
+            return None
+        number = _as_number(raw)
+        if (
+            not explicit
+            and unit.size_type.family is SizeFamily.LENGTH
+            and number is not None
+            and self._bare_chart_declined(number, region, product)
+        ):
+            return None
+        bare_chart = (
+            not explicit
+            and (unit.size_type in _ALL_BARE_SIZE_TYPES or unit.size_type is BAND_SIZE)
+            and not (
+                unit.size_type is DRESS
+                and product is not None
+                and product.family is ProductTypeFamily.BRAS
+            )
+        )
+        if bare_chart:
+            if (
+                number is None
+                or self._bare_locale(unit.size_type, number, region, product)
+                is not unit.locale
+            ):
+                return None
+        elif not explicit and unit.locale not in {
+            Locale.UNIVERSAL,
+            chart_region,
+            region,
+        }:
             return None
         try:
             size = Size(raw, unit)
@@ -564,7 +707,9 @@ class SizeDescription:
             not explicit
             and not unit.size_type.allows_bare_feed_value(product)
             and not _bra_bare_allows_dress_unit(
-                product, unit, size.raw if isinstance(size.raw, Decimal) else Decimal(0),
+                product,
+                unit,
+                size.raw if isinstance(size.raw, Decimal) else Decimal(0),
                 explicit=explicit,
             )
         ):
@@ -577,7 +722,8 @@ class SizeDescription:
         ):
             return None
         if (
-            unit.size_type is BAND_SIZE
+            explicit
+            and unit.size_type is BAND_SIZE
             and product is not None
             and product.family is ProductTypeFamily.BRAS
             and isinstance(size.raw, Decimal)
@@ -599,12 +745,16 @@ class SizeDescription:
             return None
         if product is not None and product.family is ProductTypeFamily.BRAS:
             number = _as_number(raw)
-            if number is not None and unit.size_type is BAND_SIZE and _bra_dress_number(
-                number
+            if (
+                number is not None
+                and unit.size_type is BAND_SIZE
+                and _bra_dress_number(number)
             ):
                 return None
-            if number is not None and unit.size_type is DRESS and not _bra_dress_number(
-                number
+            if (
+                number is not None
+                and unit.size_type is DRESS
+                and not _bra_dress_number(number)
             ):
                 return None
         # Dress, skirt, nightwear, and swimwear sizes are dress sizes. A cup
@@ -697,26 +847,36 @@ class SizeDescription:
         number = _number(match.group(1))
         word = match.group(2).casefold()
         proportion = _FIT_WORDS.get(word)
-        if word in {"r", "s", "l"} and _in_span(number, *_FEED_WAIST_INCHES) and (
-            product is None or not product.family.accepts_fit_code
+        if (
+            word in {"r", "s", "l"}
+            and _in_span(number, *_FEED_WAIST_INCHES)
+            and (product is None or not product.family.accepts_fit_code)
         ):
             return None
         chest = None if product is None else product.profile.chest_span
         if chest is not None and _in_span(number, *chest):
-            chart = self._chart_unit_for_number(region, number, product)
+            chest_locale = self._bare_locale(CHEST_SIZE, number, region)
+            if chest_locale is None:
+                return None
+            chart = size_unit_for_locale(CHEST_SIZE, chest_locale)
             label = Size(proportion or "regular", PROPORTION_SIZE)
-            return _Hit(SizeDescriptionFormat.NUMBERED_FIT, (Size(number, chart), label), 0.9)
+            return _Hit(
+                SizeDescriptionFormat.NUMBERED_FIT, (Size(number, chart), label), 0.9
+            )
+        if word != "full length" and proportion is None:
+            return None
+        dress = self._bare_dress(number, region, product)
+        if dress is None:
+            return None
         if word == "full length":
             return _Hit(
                 SizeDescriptionFormat.NUMBERED_FIT,
-                (self._dress_size(number, region), Size("long", TOP_LENGTH_SIZE)),
+                (dress, Size("long", TOP_LENGTH_SIZE)),
                 0.88,
             )
-        if proportion is None:
-            return None
         return _Hit(
             SizeDescriptionFormat.NUMBERED_FIT,
-            (self._dress_size(number, region), Size(proportion, PROPORTION_SIZE)),
+            (dress, Size(proportion, PROPORTION_SIZE)),
             0.88,
         )
 
@@ -760,7 +920,7 @@ class SizeDescription:
                 score = _UNLABELLED_SHOE_SCORE
             return _Hit(
                 SizeDescriptionFormat.REGIONAL_NUMBER,
-                (Size(number, self._shoe_unit(locale)),),
+                (self._shoe_size(number, locale),),
                 score,
             )
         if product is not None and product.family is ProductTypeFamily.BRAS:
@@ -779,17 +939,20 @@ class SizeDescription:
             return None
         if product is None or product.family.reads_dress_size:
             score = (
-                0.92 if product is not None and product.family.reads_dress_size else 0.75
+                0.92
+                if product is not None and product.family.reads_dress_size
+                else 0.75
             )
             return _Hit(
                 SizeDescriptionFormat.REGIONAL_NUMBER,
                 (self._dress_size(number, locale),),
                 score,
             )
-        if (
-            product.family is ProductTypeFamily.BOTTOMS
-            and locale in {Locale.UK, Locale.US, Locale.AU}
-        ):
+        if product.family is ProductTypeFamily.BOTTOMS and locale in {
+            Locale.UK,
+            Locale.US,
+            Locale.AU,
+        }:
             return _Hit(
                 SizeDescriptionFormat.REGIONAL_NUMBER,
                 (Size(number, INCH_WAIST_SIZE),),
@@ -808,7 +971,15 @@ class SizeDescription:
             return None
         number = _number(text)
         if product is not None and product.family.reads_shoe_size:
-            return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, self._shoe_unit(region)),), 0.72)
+            shoe_type = _SHOE_BY_AGE_GROUP[self._age_group]
+            locale = self._bare_locale(shoe_type, number, region)
+            if locale is None:
+                return None
+            return _Hit(
+                SizeDescriptionFormat.BARE_NUMBER,
+                (Size(number, size_unit_for_locale(shoe_type, locale)),),
+                0.72,
+            )
         collar = None if product is None else product.profile.collar_span
         if collar is not None and _in_span(number, *collar):
             unit = (
@@ -818,7 +989,11 @@ class SizeDescription:
             )
             return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, unit),), 0.7)
         waist = None if product is None else product.family.bare_waist_span
-        if waist is not None and _in_span(number, *waist):
+        if (
+            waist is not None
+            and _in_span(number, *waist)
+            and not self._bare_chart_declined(number, region, product)
+        ):
             unit = (
                 INCH_WAIST_SIZE
                 if region in {Locale.UK, Locale.US, Locale.AU}
@@ -826,10 +1001,11 @@ class SizeDescription:
             )
             return _Hit(SizeDescriptionFormat.BARE_NUMBER, (Size(number, unit),), 0.62)
         if product is not None and product.family is ProductTypeFamily.BRAS:
-            if _bra_bare_band_ok(number, region):
+            band_locale = self._bare_locale(BAND_SIZE, number, region)
+            if band_locale is not None:
                 return _Hit(
                     SizeDescriptionFormat.BARE_NUMBER,
-                    (Size(number, _bra_band_unit(region)),),
+                    (Size(number, size_unit_for_locale(BAND_SIZE, band_locale)),),
                     0.94,
                 )
             if _bra_dress_number(number):
@@ -840,10 +1016,15 @@ class SizeDescription:
                 )
             return None
         if product is None or product.family.reads_dress_size:
+            dress = self._bare_dress(number, region, product)
+            if dress is None:
+                return None
             return _Hit(
                 SizeDescriptionFormat.BARE_NUMBER,
-                (self._dress_size(number, region),),
-                0.7 if product is not None and product.family.reads_dress_size else 0.45,
+                (dress,),
+                0.7
+                if product is not None and product.family.reads_dress_size
+                else 0.45,
             )
         return None
 
@@ -1006,10 +1187,13 @@ class SizeDescription:
             )
             if embedded is None:
                 continue
+            dress = self._bare_dress(_number(embedded.group(1)), region, product)
+            if dress is None:
+                return None
             return _Hit(
                 SizeDescriptionFormat.PROPORTION,
                 (
-                    self._dress_size(_number(embedded.group(1)), region),
+                    dress,
                     Size(embedded.group("value"), PROPORTION_SIZE),
                 ),
                 0.86,
@@ -1054,12 +1238,24 @@ class SizeDescription:
         ):
             return None
         if sized:
-            locale = _prefix_locale(sized.group(1) or region.value, region)
-            score = 0.9 if product is not None and product.family.reads_shoe_size else 0.7
+            number = _number(sized.group(2))
+            shoe_type = _SHOE_BY_AGE_GROUP[self._age_group]
+            if sized.group(1):
+                locale = _prefix_locale(sized.group(1), region)
+            else:
+                locale = self._bare_locale(shoe_type, number, region)
+            if locale is None:
+                return None
+            score = (
+                0.9 if product is not None and product.family.reads_shoe_size else 0.7
+            )
             return _Hit(
                 SizeDescriptionFormat.SHOE_WIDTH,
                 (
-                    Size(_number(sized.group(2)), self._shoe_unit(locale)),
+                    Size(
+                        number,
+                        size_unit_for_locale(shoe_type, self._chart_locale(locale)),
+                    ),
                     Size(sized.group(3), SHOE_WIDTH_SIZE),
                 ),
                 score,
@@ -1111,6 +1307,56 @@ class SizeDescription:
     def _dress_size(self, number: Decimal, locale: Locale) -> Size:
         return Size(number, self._chart_unit(DRESS, locale))
 
+    def _shoe_size(self, number: Decimal, locale: Locale) -> Size:
+        """Shoe size in ``locale`` for this description's age group."""
+        return Size(
+            number,
+            size_unit_for_locale(
+                _SHOE_BY_AGE_GROUP[self._age_group], self._chart_locale(locale)
+            ),
+        )
+
+    def _bare_chart_declined(
+        self, number: Decimal, region: Locale, product: ProductType | None
+    ) -> bool:
+        """Whether a lone number was refused as a chart size for ``product``.
+
+        A shoe, jeans, dress, or bra number that is on no chart, or on more
+        than one, must not fall through to a length.
+        """
+        if product is None:
+            return False
+        if product.family.reads_shoe_size:
+            chart_type = _SHOE_BY_AGE_GROUP[self._age_group]
+        elif product.family is ProductTypeFamily.BOTTOMS:
+            chart_type = WAIST_SIZE
+        elif product.family.reads_dress_size:
+            chart_type = DRESS
+        elif product.family is ProductTypeFamily.BRAS:
+            chart_type = BAND_SIZE
+        else:
+            return False
+        return self._bare_locale(chart_type, number, region, product) is None
+
+    def _bare_locale(
+        self,
+        size_type: SizeType,
+        number: Decimal,
+        region: Locale,
+        product: ProductType | None = None,
+    ) -> Locale | None:
+        return _bare_locale(size_type, number, region, self._age_group, product)
+
+    def _bare_dress(
+        self, number: Decimal, region: Locale, product: ProductType | None
+    ) -> Size | None:
+        locale = self._bare_locale(DRESS, number, region, product)
+        return (
+            None
+            if locale is None
+            else Size(number, size_unit_for_locale(DRESS, locale))
+        )
+
     def _reads_as_shoe(
         self, product: ProductType | None, locale: Locale, number: Decimal
     ) -> bool:
@@ -1148,7 +1394,8 @@ class SizeDescription:
         if not preferred_regions:
             return (source,)
         return tuple(
-            _require_locale(item, name="preferred_regions") for item in preferred_regions
+            _require_locale(item, name="preferred_regions")
+            for item in preferred_regions
         )
 
     def _choose_values(
@@ -1175,7 +1422,9 @@ class SizeDescription:
                 discarded.append(DiscardedToken(other.display(), "duplicate"))
         return tuple(kept), tuple(discarded)
 
-    def _prefer(self, group: list[Size], order: tuple[Locale, ...], source: Locale) -> Size:
+    def _prefer(
+        self, group: list[Size], order: tuple[Locale, ...], source: Locale
+    ) -> Size:
         def rank(size: Size) -> tuple[int, int]:
             locale = size.size_unit.locale
             if locale is Locale.UNIVERSAL:
@@ -1188,7 +1437,10 @@ class SizeDescription:
         return sorted(group, key=rank)[0]
 
     def _maybe_convert_length(self, size: Size, region: Locale) -> Size | None:
-        if size.size_type.family is not SizeFamily.LENGTH or not size.size_unit.length_unit:
+        if (
+            size.size_type.family is not SizeFamily.LENGTH
+            or not size.size_unit.length_unit
+        ):
             return size
         wanted = "cm" if region in {Locale.EU, Locale.FR} else "in"
         if size.size_unit.length_unit == wanted:
@@ -1288,11 +1540,7 @@ class SizeDescription:
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
         generic = next(size for size in sizes if size.size_type is LETTER)
-        cup = next(
-            size
-            for size in sizes
-            if size.size_type in {CUP_SIZE, CUP_RANGE}
-        )
+        cup = next(size for size in sizes if size.size_type in {CUP_SIZE, CUP_RANGE})
         generic_text = generic.size_type.label_text(str(generic.raw), region)
         if cup.size_type is CUP_RANGE:
             cup_text = cup.size_type.label_text(str(cup.raw), region)
@@ -1321,9 +1569,7 @@ class SizeDescription:
     def _write_age(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        age = next(
-            size for size in sizes if size.size_type in {AGE_MONTHS, AGE_YEARS}
-        )
+        age = next(size for size in sizes if size.size_type in {AGE_MONTHS, AGE_YEARS})
         return age.display(), (age,), ()
 
     def _write_proportion(
@@ -1437,6 +1683,7 @@ def decode_size_description(
     value: str,
     source_region: Locale,
     product_type: ProductType | None = None,
+    age_group: AgeGroup | None = None,
 ) -> DecodedSizeDescription:
     """Read one feed size string into size values.
 
@@ -1444,8 +1691,12 @@ def decode_size_description(
     ``product_type`` drops formats that do not belong to that range and raises
     confidence when several formats could fit. ``confidence`` is ``1`` when a
     single format matches, and lower when another format was also plausible.
+
+    An unprefixed number is read against the default charts for ``age_group``
+    (adult when omitted). Kids and baby shoe sizes are only returned for
+    ``AgeGroup.CHILD`` and ``AgeGroup.BABY``.
     """
-    return _SIZE_DESCRIPTIONS.decode(value, source_region, product_type)
+    return _SIZE_DESCRIPTIONS.decode(value, source_region, product_type, age_group)
 
 
 def encode_size_description(

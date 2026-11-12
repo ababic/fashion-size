@@ -4,6 +4,7 @@ import re
 
 import pytest
 
+from fashion_size.demographics import AgeGroup
 from fashion_size.descriptions import decode_size_description, encode_size_description
 from fashion_size.product_types import ProductType
 from fashion_size.types import (
@@ -258,16 +259,16 @@ def _ids(decoded):
         ("UK 7", Locale.UK, ProductType.SHOES, "uk-adult-shoe-size", "7"),
         ("EU 41", Locale.UK, ProductType.BOOTS, "eu-adult-shoe-size", "41"),
         ("US 8", Locale.UK, ProductType.TRAINERS, "us-adult-shoe-size", "8"),
-        ("12", Locale.EU, ProductType.DRESSES, "eu-dress-size", "12"),
-        ("12", Locale.FR, ProductType.DRESSES, "eu-dress-size", "12"),
+        ("38", Locale.EU, ProductType.DRESSES, "eu-dress-size", "38"),
+        ("38", Locale.FR, ProductType.DRESSES, "eu-dress-size", "38"),
         ("12", Locale.US, ProductType.DRESSES, "us-dress-size", "12"),
         ("12", Locale.AU, ProductType.NIGHTWEAR, "au-dress-size", "12"),
         ("12", Locale.UK, ProductType.SHOES, "uk-adult-shoe-size", "12"),
         ("41", Locale.EU, ProductType.SHOES, "eu-adult-shoe-size", "41"),
         ("32", Locale.UK, ProductType.JEANS, "uk-waist-size", "32"),
         ("32", Locale.US, ProductType.TROUSERS, "us-waist-size", "32"),
-        ("32", Locale.EU, ProductType.JEANS, "eu-waist-size", "32"),
-        ("8", Locale.UK, ProductType.SHORTS, "uk-waist-size", "8"),
+        ("46", Locale.EU, ProductType.JEANS, "eu-waist-size", "46"),
+        ("34", Locale.UK, ProductType.SHORTS, "uk-waist-size", "34"),
     ],
 )
 def test_regional_and_bare_numbers(raw, region, product, slug, value):
@@ -846,15 +847,11 @@ def test_unlabelled_eu_span_is_an_adult_shoe():
 
 
 def test_cup_letter_is_ignored_on_a_dress_product():
-    dress = decode_size_description(
-        "32DD", Locale.UK, product_type=ProductType.DRESSES
-    )
+    dress = decode_size_description("32DD", Locale.UK, product_type=ProductType.DRESSES)
     assert [size.size_unit.slug for size in dress.sizes] == ["uk-dress-size"]
     assert dress.sizes[0].raw == 32
 
-    skirt = decode_size_description(
-        "32DD", Locale.UK, product_type=ProductType.SKIRTS
-    )
+    skirt = decode_size_description("32DD", Locale.UK, product_type=ProductType.SKIRTS)
     assert [size.size_type.slug for size in skirt.sizes] == ["dress"]
 
     bra = decode_size_description("32DD", Locale.UK, product_type=ProductType.BRAS)
@@ -865,9 +862,7 @@ def test_cup_letter_is_ignored_on_a_dress_product():
 
 
 def test_bra_band_stays_a_uk_inch_band():
-    decoded = decode_size_description(
-        "32DD", Locale.FR, product_type=ProductType.BRAS
-    )
+    decoded = decode_size_description("32DD", Locale.FR, product_type=ProductType.BRAS)
     assert [size.size_unit for size in decoded.sizes] == [UK_BAND_SIZE, UK_CUP_SIZE]
 
 
@@ -893,7 +888,10 @@ def test_bra_bare_band_uses_source_region():
     assert eu.sizes[0].raw == 75
     fr = decode_size_description("90", Locale.FR, product_type=ProductType.BRAS)
     assert fr.sizes[0].size_unit.slug == "fr-band-size"
-    assert decode_size_description("32", Locale.EU, product_type=ProductType.BRAS).sizes == ()
+    assert (
+        decode_size_description("32", Locale.EU, product_type=ProductType.BRAS).sizes
+        == ()
+    )
     eu_dress = decode_size_description("10", Locale.EU, product_type=ProductType.BRAS)
     assert _ids(eu_dress) == [("uk-dress-size", "10")]
 
@@ -964,3 +962,105 @@ def test_jeans_slash_round_trips():
         ("in-trousers-inseam", "30"),
     ]
     assert encode_size_description(decoded.sizes, Locale.UK).text == "32/30"
+
+
+@pytest.mark.parametrize(
+    ("raw", "region", "product", "slug", "value"),
+    [
+        ("8", Locale.UK, ProductType.SHOES, "uk-adult-shoe-size", "8"),
+        ("39", Locale.UK, ProductType.SHOES, "eu-adult-shoe-size", "39"),
+        ("34", Locale.UK, ProductType.SHOES, "eu-adult-shoe-size", "34"),
+        ("46", Locale.UK, ProductType.SHOES, "eu-adult-shoe-size", "46"),
+        ("62", Locale.UK, ProductType.JEANS, "eu-waist-size", "62"),
+        ("50", Locale.UK, ProductType.JEANS, "uk-waist-size", "50"),
+        ("40", Locale.UK, ProductType.DRESSES, "eu-dress-size", "40"),
+        ("32", Locale.UK, ProductType.DRESSES, "uk-dress-size", "32"),
+        ("32", Locale.EU, ProductType.DRESSES, "eu-dress-size", "32"),
+        ("8", Locale.UK, ProductType.DRESSES, "uk-dress-size", "8"),
+        ("70", Locale.UK, ProductType.BRAS, "eu-band-size", "70"),
+        ("32", Locale.UK, ProductType.BRAS, "uk-band-size", "32"),
+        ("EU 39", Locale.UK, ProductType.SHOES, "eu-adult-shoe-size", "39"),
+    ],
+)
+def test_bare_number_follows_the_chart_it_is_on(raw, region, product, slug, value):
+    decoded = decode_size_description(raw, region, product_type=product)
+    assert _ids(decoded)[0] == (slug, value)
+
+
+@pytest.mark.parametrize(
+    ("raw", "region", "product"),
+    [
+        ("30", Locale.EU, ProductType.JEANS),
+        ("12", Locale.EU, ProductType.DRESSES),
+        ("100", Locale.UK, ProductType.SHOES),
+        ("28", Locale.UK, ProductType.SHOES),
+        ("20", Locale.UK, ProductType.SHOES),
+    ],
+)
+def test_bare_number_on_no_chart_or_several_is_not_guessed(raw, region, product):
+    decoded = decode_size_description(raw, region, product_type=product)
+    assert decoded.sizes == ()
+
+
+@pytest.mark.parametrize(
+    ("raw", "age_group", "slug", "value"),
+    [
+        ("28", AgeGroup.CHILD, "eu-kids-shoe-size", "28"),
+        ("36", AgeGroup.CHILD, "eu-kids-shoe-size", "36"),
+        ("10", AgeGroup.CHILD, "uk-kids-shoe-size", "10"),
+        ("20", AgeGroup.BABY, "eu-baby-shoe-size", "20"),
+        ("3", AgeGroup.BABY, "uk-baby-shoe-size", "3"),
+        ("39", AgeGroup.ADULT, "eu-adult-shoe-size", "39"),
+    ],
+)
+def test_age_group_picks_the_shoe_chart_for_a_bare_number(raw, age_group, slug, value):
+    decoded = decode_size_description(
+        raw, Locale.UK, product_type=ProductType.SHOES, age_group=age_group
+    )
+    assert _ids(decoded) == [(slug, value)]
+
+
+def test_age_group_rejects_other_charts_and_bad_types():
+    decoded = decode_size_description(
+        "39", Locale.UK, product_type=ProductType.SHOES, age_group=AgeGroup.CHILD
+    )
+    assert decoded.sizes == ()
+    with pytest.raises(TypeError, match="age_group"):
+        decode_size_description("8", Locale.UK, age_group="child")
+
+
+@pytest.mark.parametrize(
+    ("raw", "region", "slug"),
+    [
+        ("75", Locale.UK, "eu-band-size"),
+        ("80", Locale.UK, "eu-band-size"),
+        ("70", Locale.UK, "eu-band-size"),
+        ("90", Locale.FR, "fr-band-size"),
+    ],
+)
+def test_bare_band_uses_chart_rows(raw, region, slug):
+    decoded = decode_size_description(raw, region, product_type=ProductType.BRAS)
+    assert _ids(decoded) == [(slug, raw)]
+
+
+@pytest.mark.parametrize("raw", ["29", "72"])
+def test_off_chart_band_is_not_a_size(raw):
+    decoded = decode_size_description(raw, Locale.UK, product_type=ProductType.BRAS)
+    assert decoded.sizes == ()
+
+
+def test_age_group_applies_to_a_prefixed_shoe():
+    decoded = decode_size_description(
+        "EU 28", Locale.UK, product_type=ProductType.SHOES, age_group=AgeGroup.CHILD
+    )
+    assert _ids(decoded) == [("eu-kids-shoe-size", "28")]
+
+
+def test_marked_length_stays_when_a_bare_number_is_declined():
+    quoted = decode_size_description('30"', Locale.EU, product_type=ProductType.JEANS)
+    assert _ids(quoted) == [("in-waist-size", "30")]
+    pair = decode_size_description("30/32", Locale.EU, product_type=ProductType.JEANS)
+    assert [size.size_unit.slug for size in pair.sizes] == [
+        "in-waist-size",
+        "in-trousers-inseam",
+    ]
