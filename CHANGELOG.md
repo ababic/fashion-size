@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2026.11.12.1
+
+- Garment inseam inch bounds: `shorts-inseam` 2–24 (was 2–22), `trousers-inseam` 22–42 (was 24–42). The 22–24 in band overlaps so long shorts/bermudas and cropped/petite trouser legs validate on the right schema; product type disambiguates. Generic `inside-leg` remains 2–42 in.
+
 ## 2026.11.12
 
 - `chart_hits` lists every default chart a size token sits on, and the potential product families, age groups, and genders of those hits. Each hit stores the size-type slug (`dress`, `adult-shoe`, `kids-shoe`, `baby-shoe`, `waist-size`, `chest-size`, `band-size`, `cup-size`, `cup-range`, `letter`, `age-years`, `age-months`, or `unplaced`). Age, gender, and region are the enums, or blank. A region prefix on the token keeps that region. A bare number does not assume UK or a dress size. A length token (`SHT`, `REG`, `LNG`, `PET`, `TAL`, or `S`/`R`/`L`/`T`) keeps adult dress, waist, and chest hits. A trailing `L` is that length, so `32L` is not cup L. A bare `M` is cup M, so `32M` is a band plus cup M rather than an age in months. A cup range has to contain a hyphen, and an even bra-dress number beside one is UK dress even when the cell was prefixed (`US 10 A-C`). A letter or a number on no chart abstains, so the other tokens on a line can still decide. `decode_size_description` is unchanged.
