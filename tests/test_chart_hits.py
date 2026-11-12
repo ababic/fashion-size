@@ -419,3 +419,92 @@ def test_empty_and_unrecognised_tokens_have_no_hits():
 def test_token_must_be_a_string():
     with pytest.raises(TypeError, match="token must be a str"):
         chart_hits(None)  # type: ignore[arg-type]
+
+
+_SIZE_KINDS = frozenset(
+    {
+        "dress",
+        "adult-shoe",
+        "kids-shoe",
+        "baby-shoe",
+        "waist-size",
+        "chest-size",
+        "band-size",
+        "cup-size",
+        "cup-range",
+        "letter",
+        "age-years",
+        "age-months",
+        "unplaced",
+    }
+)
+
+
+def test_size_kind_is_the_size_type_slug():
+    tokens = (
+        "14 REG",
+        "EU 39",
+        "8",
+        "58/60L",
+        "10 A-C",
+        "32C",
+        "32M",
+        "32L",
+        "S",
+        "2-3 years",
+        "6 months",
+        "99",
+        "1",
+    )
+    for token in tokens:
+        for hit in chart_hits(token).hits:
+            assert hit.size_kind in _SIZE_KINDS
+
+
+def test_trailing_l_is_a_length_and_cup_l_is_not_returned():
+    result = chart_hits("32L")
+    assert _ids(result) == [
+        ("dress", "uk", "adult", "female", Decimal(32), "l", ""),
+        ("dress", "eu", "adult", "female", Decimal(32), "l", ""),
+        ("dress", "au", "adult", "female", Decimal(32), "l", ""),
+        ("dress", "uk", "adult", "male", Decimal(32), "l", ""),
+        ("dress", "us", "adult", "male", Decimal(32), "l", ""),
+        ("dress", "au", "adult", "male", Decimal(32), "l", ""),
+        ("waist-size", "uk", "adult", "male", Decimal(32), "l", ""),
+        ("waist-size", "us", "adult", "male", Decimal(32), "l", ""),
+        ("waist-size", "au", "adult", "male", Decimal(32), "l", ""),
+        ("chest-size", "uk", "adult", "male", Decimal(32), "l", ""),
+        ("chest-size", "us", "adult", "male", Decimal(32), "l", ""),
+        ("chest-size", "au", "adult", "male", Decimal(32), "l", ""),
+    ]
+    assert not any(hit.size_kind == "cup-size" for hit in result.hits)
+
+
+def test_32m_is_a_band_plus_cup_m():
+    result = chart_hits("32M")
+    assert _ids(result) == [
+        ("band-size", "uk", "adult", "", Decimal(32), "", ""),
+        ("band-size", "us", "adult", "", Decimal(32), "", ""),
+        ("band-size", "au", "adult", "", Decimal(32), "", ""),
+        ("cup-size", "", "adult", "female", None, "", "M"),
+    ]
+    assert all(hit.families == _BRAS for hit in result.hits)
+    # A bare M is the cup letter. Months keep the word.
+    bare = chart_hits("6m")
+    assert bare.hits[-1].size_kind == "cup-size"
+    assert bare.hits[-1].label == "M"
+    assert chart_hits("6 months").hits[0].size_kind == "age-months"
+
+
+@pytest.mark.parametrize("raw", ["A C", "10 A C", "Medium A-C"])
+def test_cup_range_without_a_hyphen_matches_nothing(raw: str):
+    result = chart_hits(raw)
+    assert result.hits == ()
+    assert result.families == result.age_groups == result.genders == frozenset()
+
+
+def test_bra_dress_cup_range_does_not_keep_the_written_region():
+    result = chart_hits("US 10 A-C")
+    assert _ids(result) == _ids(chart_hits("10 A-C"))
+    assert result.hits[0].chart_region is Locale.UK
+    assert all(hit.chart_region is not Locale.US for hit in result.hits)

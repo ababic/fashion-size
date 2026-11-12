@@ -50,18 +50,16 @@ _UNPLACED = "unplaced"
 _BRAS: frozenset[ProductTypeFamily] = frozenset({ProductTypeFamily.BRAS})
 _NO_FAMILIES: frozenset[ProductTypeFamily] = frozenset()
 # Trailing fit codes. Single letters are the short forms (``60L``); the words
-# are the feed abbreviations. ``S``, ``R``, and ``L`` are cup letters too, so a
-# number plus one of those letters is a length, not a band.
+# are the feed abbreviations. ``L`` is also on the cup chart, so a trailing
+# ``L`` is always the length (``32L``, ``58/60L``) and cup ``L`` is not returned.
+# ``S`` and ``R`` are length codes and are not cup letters. ``32M`` stays a cup.
 _LENGTH = r"SHT|REG|LNG|PET|TAL|[SRLT]"
 _REGION = r"UK|EUR|EU|US|AU|FR"
 _NUM = r"\d{1,2}(?:\.\d)?"
+# A cup range has to contain a hyphen. ``A C`` and ``10 A C`` are not ranges.
 _CUP_RANGE_TEXT = r"GG\s*[-–]\s*H|A\s*[-–]\s*C|D\s*[-–]\s*E|F\s*[-–]\s*G"
 _CUP_LETTER = "|".join(
-    sorted(
-        (token for token in CUP_TOKENS if token not in {"S", "R", "L"}),
-        key=len,
-        reverse=True,
-    )
+    sorted((token for token in CUP_TOKENS if token != "L"), key=len, reverse=True)
 )
 _LENGTH_KINDS = frozenset(
     {
@@ -133,16 +131,17 @@ _CUP_CELL = re.compile(
 class ChartHit:
     """One chart a token sits on, or one label that is not a chart number.
 
-    ``size_kind`` is the size-type slug (``dress``, ``adult-shoe``,
-    ``band-size``, ``cup-size``, ``cup-range``, ``letter``, ``age-years``,
-    ``age-months``) or ``unplaced`` when the number is on no chart.
+    ``size_kind`` is the size-type slug: ``dress``, ``adult-shoe``,
+    ``kids-shoe``, ``baby-shoe``, ``waist-size``, ``chest-size``, ``band-size``,
+    ``cup-size``, ``cup-range``, ``letter``, ``age-years``, ``age-months``, or
+    ``unplaced`` when the number is on no chart.
 
     ``families`` is that size type's product affinity, collapsed to families.
     A cup or cup range on the cell replaces every hit's families with bras.
     A bra dress number stays ``size_kind`` ``dress``.
 
-    ``chart_region``, ``age_group``, and ``gender`` are ``None`` when the hit
-    has none. ``label`` is a cup, cup range, letter, or age token.
+    ``chart_region``, ``age_group``, and ``gender`` are the enums, or ``None``
+    when the hit has none. ``label`` is a cup, cup range, letter, or age token.
     ``length_token`` is the fit code written on the cell (``reg``, ``l``),
     lowercased, or ``""``.
     """
@@ -181,13 +180,24 @@ def chart_hits(token: str) -> ChartHits:
     the EU centimetre label plus 15.
 
     Hits are ordered by number, then size kind, age, gender, and region.
+
+    A trailing ``L`` is a length, because ``58/60L`` has to be one. ``32L`` is
+    adult dress, waist, and chest, and cup ``L`` is not returned. ``L`` is the
+    only length letter on the cup chart. ``32M`` is a band plus cup ``M``, not
+    an age: a bare ``M`` is the cup. Months are written ``6 months`` or
+    ``6 mths``. A cup range has to contain a hyphen (``A-C``, ``10 A-C``).
+    ``A C``, ``10 A C``, and ``Medium A-C`` match nothing. An even bra-dress
+    number beside a cup range is always UK dress, so ``US 10 A-C`` comes back
+    as UK dress and the written ``US`` is not stored on the hit.
     """
     if not isinstance(token, str):
         raise TypeError(f"token must be a str, not {type(token).__name__}.")
     text = " ".join(token.strip().split())
     if not text:
         return _collect(())
-    for reader in (_letter_hit, _age_hit, _cup_range_hits, _cup_hits, _number_hits):
+    # Cup before age: a bare ``M`` is a cup letter, and the month pattern also
+    # accepts ``m``. ``32M`` is a band plus cup M. ``6 months`` stays an age.
+    for reader in (_letter_hit, _cup_range_hits, _cup_hits, _age_hit, _number_hits):
         found = reader(text)
         if found is not None:
             return _collect(found)
