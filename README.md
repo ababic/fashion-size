@@ -71,6 +71,34 @@ An unprefixed number is read in `source_region` only when it is on that region's
 
 A bra string such as `32DD` is a UK inch band from 28 to 56 plus a cup letter. A bare band with no cup uses the feed `source_region` (UK/US inches, EU centimetres, AU or FR band labels). Otherwise an even UK dress size from 4 to 24 applies on bras and stays a UK dress label regardless of `source_region` (for example `10` is dress, `32` is band in the UK). A cup span such as `A-C`, `D-E`, `F-G`, or `GG-H` is a `cup-range` label and is not a chart cup; it may sit alone or next to a dress or band (`10 A-C`). Strings such as `M C` or `Medium A-C` on a bra or swimwear product are a generic letter size plus a chart cup letter or a `cup-range`. On a dress, skirt, nightwear, or swimwear product a cup letter paired with a numeric size is ignored (`32DD` on a dress is dress 32 only). A French prefix is folded onto EU before an unlabelled number in the adult shoe span (35–50) is read as a shoe size, so a lone `EU 40` or `FR 40` with no product type is an EU adult shoe size. A French band outside that span, such as `FR 90`, stays a band size.
 
+## Chart hits
+
+`chart_hits` lists every default chart one size token sits on, and the families, age groups, and genders those charts could belong to. It does not pick a single reading. `decode_size_description` still does that once the product type is known. The function takes the token only: no source region and no product type.
+
+```python
+from fashion_size.chart_hits import chart_hits
+
+chart_hits("14 REG")
+chart_hits("EU 39")
+chart_hits("8")
+```
+
+`ChartHits.families`, `age_groups`, and `genders` are the union of the hits. A hit with a blank age or gender adds nothing to that set. An empty set abstains, so a letter or a number that sits on no chart leaves the other tokens on the line free to decide. The caller stores the hits and intersects the three sets.
+
+A region prefix keeps that region's charts. `EU 39` is the EU adult shoe charts, women's and men's. No prefix does not assume UK and does not assume a dress size, so bare `39` also sits on the UK, US, and AU men's waist and chest charts. French dress, shoe, and chest labels use the EU numbers and are reported as `FR`. French waist is not a chart. A French band is the EU centimetre label plus 15.
+
+A length token (`SHT`, `REG`, `LNG`, `PET`, `TAL`, or a trailing `S`, `R`, `L`, or `T`) keeps adult dress, waist, and chest hits and drops shoe, band, and child hits. `14 REG` is three adult women's dress hits, UK, US, and AU, each with `length_token` `reg`. `58/60L` keeps the EU women's dress, EU men's dress, EU waist, and EU chest charts for both numbers. `62L` is EU waist and EU chest.
+
+A cup letter reads the number as a band on each band chart that contains it (UK and US inches, EU centimetres, AU dress-style numbers, FR the EU label plus 15) and does not return the dress hit. `30C` and `32C` are a band plus cup C, in the bras family, even though UK dress 30 and 32 are on the women's chart. The band chart is one chart for every adult, so the band hit's gender is blank. The cup hit is adult women's. `32M` is a band plus cup M. A trailing `L` is always a length, because `58/60L` has to be one: `32L` is adult dress, waist, and chest, and cup L is not returned. `L` is the only length letter that is also on the cup chart. `32M` is a band plus cup M. A bare `M` after a number is that cup, not months; months are written `6 months` or `6 mths`.
+
+A cup range (`A-C`, `D-E`, `F-G`, `GG-H`) has to contain a hyphen. It is one bras hit with no number and no region. `A C`, `10 A C`, and `Medium A-C` match nothing. An even number from 4 to 24 beside a range is UK dress, family bras, and the shoe and band hits for that number are dropped. `10 A-C` is that dress size plus the cup range. The written prefix is not kept: `US 10 A-C` comes back as UK dress, and no hit records that the cell said US.
+
+Each hit's `size_kind` is the size-type slug: `dress`, `adult-shoe`, `kids-shoe`, `baby-shoe`, `waist-size`, `chest-size`, `band-size`, `cup-size`, `cup-range`, `letter`, `age-years`, `age-months`, or `unplaced`. `chart_region`, `age_group`, and `gender` are the enums, or blank.
+
+A letter (`S`, `M`, `L`, `XL`, and the usual synonyms) is one hit with no family, so all three sets stay empty. An age label (`2-3 years`, `6 months`) is one hit with no family. Years are children and months are babies, and that age group is the only entry in `age_groups`. A number on no chart is one `unplaced` hit with no region and empty sets.
+
+The kids' shoe rows are registered for babies and for children. They are returned once, as children. Baby shoes are the separate chart (UK 0–5.5, EU 16–22) and those hits are babies. A number that also sits on an adult chart returns the adult hit as well.
+
 ## Brand charts
 
 ```python
