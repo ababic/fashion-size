@@ -99,7 +99,7 @@ from fashion_size.types import (
 
 
 def test_version_is_the_current_release():
-    assert __version__ == "2026.11.12.1"
+    assert __version__ == "2026.11.12.2"
 
 
 def test_readme_brand_chart_example():
@@ -456,13 +456,25 @@ def test_garment_inseam_length_bounds():
     assert size_from_attribute_option("in-shorts-inseam", '33"') is None
 
     assert (
+        Size.from_raw(17, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("43.18")
+    )
+    assert (
+        Size.from_raw(18, INCH_TROUSERS_INSEAM)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("45.72")
+    )
+    assert (
         Size.from_raw(22, INCH_TROUSERS_INSEAM)
         .convert("cm", demographic=demographic)
         .raw
         == Decimal("55.88")
     )
     with pytest.raises(LengthOutOfRangeError):
-        Size.from_raw(Decimal("21.9"), INCH_TROUSERS_INSEAM).convert(
+        Size.from_raw(Decimal("16.9"), INCH_TROUSERS_INSEAM).convert(
             "cm", demographic=demographic
         )
 
@@ -503,7 +515,7 @@ def test_garment_inseam_length_bounds():
 
     assert SHORTS_INSEAM.length_range_start == Decimal("2")
     assert SHORTS_INSEAM.length_range_stop == Decimal("24")
-    assert TROUSERS_INSEAM.length_range_start == Decimal("22")
+    assert TROUSERS_INSEAM.length_range_start == Decimal("17")
     assert TROUSERS_INSEAM.length_range_stop == Decimal("42")
     assert SHORTS_INSEAM.length_range is not None
     assert INCH_SHORTS_INSEAM.length_range == SHORTS_INSEAM.length_range
@@ -525,6 +537,15 @@ def test_garment_inseam_length_bounds():
         SHORTS_INSEAM,
         INSIDE_LEG,
     )
+    assert length_size_types_for_inches(16) == (
+        SHORTS_INSEAM,
+        INSIDE_LEG,
+    )
+    assert length_size_types_for_inches(18) == (
+        SHORTS_INSEAM,
+        TROUSERS_INSEAM,
+        INSIDE_LEG,
+    )
     assert len(length_size_types_for_inches(10, candidates=())) == 0
     assert length_size_types_for_inches(32) == (
         TROUSERS_INSEAM,
@@ -535,13 +556,13 @@ def test_garment_inseam_length_bounds():
         INSIDE_LEG,
     )
     assert length_size_types_for_inches(23) == (
-        TROUSERS_INSEAM,
         SHORTS_INSEAM,
+        TROUSERS_INSEAM,
         INSIDE_LEG,
     )
     assert length_size_types_for_inches(22) == (
-        TROUSERS_INSEAM,
         SHORTS_INSEAM,
+        TROUSERS_INSEAM,
         INSIDE_LEG,
     )
     assert length_size_types_for_measurement(

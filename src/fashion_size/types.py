@@ -828,9 +828,9 @@ INSIDE_LEG = SizeType(
     affinity=_affinity(ProductTypeFamily.BOTTOMS),
     feed_mark="L",
 )
-# Inseam bounds follow common retail spans with deliberate overlap (22–24 in)
-# between shorts (bermuda / long shorts) and trousers (cropped / petite legs).
-# Disambiguation is by product type and size schema, not inch value alone.
+# Inseam bounds follow common retail spans with deliberate overlap (17–24 in)
+# between shorts (bermuda / long shorts) and trousers (cropped leggings, petite
+# legs). Disambiguation is by product type and size schema, not inch value alone.
 SHORTS_INSEAM = SizeType(
     SizeTypeSlug.SHORTS_INSEAM,
     SizeFamily.LENGTH,
@@ -846,7 +846,7 @@ TROUSERS_INSEAM = SizeType(
     SizeFamily.LENGTH,
     "Trousers inseam",
     ("trousers-inseam",),
-    length_min_inches=Decimal("22"),
+    length_min_inches=Decimal("17"),
     length_max_inches=Decimal("42"),
     affinity=_affinity(ProductTypeFamily.BOTTOMS),
     feed_mark="L",
