@@ -79,13 +79,13 @@ uv run pytest tests/test_fashion_size.py
 uv run ruff check src tests
 ```
 
-CI still uses `pip install -e ".[testing]"` on Python 3.12–3.14. Regenerate and commit `uv.lock` after changing `[dependency-groups]` or optional dev deps.
+Regenerate and commit `uv.lock` after changing `[dependency-groups]` or optional dev deps.
 
-CI runs:
+CI runs (`.github/workflows/test.yml` and release tests) via [uv](https://docs.astral.sh/uv/): `uv sync --locked`, then `uv run pytest` / `uv run ruff` / `uv build`.
 
 - Tests on Python `3.12`, `3.13`, `3.14`.
 - Ruff lint on Python `3.12`.
-- Wheel build/install smoke check.
+- Wheel build/install smoke check (`uv build`, `uvx twine check`).
 
 ## 6) Playbook: changing conversion logic
 

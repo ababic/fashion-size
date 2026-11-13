@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Local development uses [uv](https://docs.astral.sh/uv/): `uv sync`, then `uv run pytest` / `uv run ruff`. Committed `uv.lock` and `.python-version` (3.12). Optional `pip install -e ".[testing,development]"` still works.
+- Local development and CI use [uv](https://docs.astral.sh/uv/): `uv sync` / `uv sync --locked`, then `uv run pytest` / `uv run ruff`. Committed `uv.lock` and `.python-version` (3.12). GitHub Actions builds wheels with `uv build`. Optional `pip install -e ".[testing,development]"` still works locally.
 
 ## 2026.11.13
 
