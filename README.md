@@ -189,7 +189,7 @@ uv run pytest
 uv run ruff check src tests
 ```
 
-`uv sync` creates `.venv` and installs the package plus the locked `dev` group (pytest and ruff). `.python-version` pins Python 3.12 for local work; CI still tests 3.12–3.14. Commit changes to `uv.lock` when dev dependencies change.
+`uv sync` creates `.venv` and installs the package plus the locked `dev` group (pytest and ruff). `.python-version` pins Python 3.12 for local work; GitHub Actions runs `uv sync --locked` on Python 3.12–3.14. Commit changes to `uv.lock` when dev dependencies change.
 
 Without uv: `pip install -e ".[testing,development]"` then run `pytest` and `ruff` as usual.
 
