@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `encode_size_description` writes the listing string: inch letters (`W30`, `L30`), `30/32`, `30L`, `40R`, `34DD`, and length short forms (`S`/`R`/`L`/`XL`/`XS`/`P`) for UK, US, AU, EU, and FR. `Locale.prefers_length_short_form` and `SizeType.listing_text` own that choice; `label_text` still returns full regional words such as French `Court`. `age_group` selects child and baby shoes, months versus years, and the demographic used when a length changes unit. Encode takes real `Size` values only; opaque catalogue text stays with the caller. The letter `ONE` displays as `One size`. A decode-only format id is an error. An empty result has no format id and confidence `0`.
+
 ## 2026.11.12.2
 
 - `trousers-inseam` minimum lowered to **17 in** (was 22 in in 2026.11.12.1) for cropped leggings and short-leg trousers. Overlap with `shorts-inseam` (2–24 in) is now **17–24 in**; product type still disambiguates. Values below 17 in remain invalid on trousers inseam (not extended toward dress-size mis-mappings).

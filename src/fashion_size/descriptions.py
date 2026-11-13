@@ -32,6 +32,7 @@ from fashion_size.types import (
     AGE_YEARS_SIZE,
     BABY_SHOE,
     BAND_SIZE,
+    CHEST,
     CHEST_SIZE,
     CM_COLLAR_SIZE,
     CM_WAIST_SIZE,
@@ -44,6 +45,7 @@ from fashion_size.types import (
     INCH_SLEEVE_SIZE,
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
+    INSIDE_LEG,
     KIDS_SHOE,
     LETTER,
     LETTER_SIZE,
@@ -51,6 +53,7 @@ from fashion_size.types import (
     PROPORTION_SIZE,
     SHOE_WIDTH,
     SHOE_WIDTH_SIZE,
+    SHORTS_INSEAM,
     SIZE_UNITS,
     TOP_LENGTH_SIZE,
     TROUSER_LENGTH,
@@ -72,8 +75,10 @@ from fashion_size.types import (
     length_value_in_range,
     normalize_cup_token,
     normalize_raw,
+    round_length_for_display,
     size_unit_for_length_unit,
     size_unit_for_locale,
+    uses_inch_quote,
 )
 
 _REGION_PREFIX = r"(?:UK|EU|EUR|US|AU|FR)"
@@ -155,6 +160,26 @@ class SizeDescriptionFormat(StrEnum):
     BARE_NUMBER = "bare-number"
     SHOE = "shoe"
     PIECES = "pieces"
+
+
+# Decode readers. Passing one of these as ``format`` is an error: they are not writers.
+_DECODE_ONLY_FORMATS = frozenset(
+    {
+        SizeDescriptionFormat.REGIONS,
+        SizeDescriptionFormat.NUMBERED_FIT,
+        SizeDescriptionFormat.COLLAR_SLEEVE,
+        SizeDescriptionFormat.UNIT_PATTERNS,
+        SizeDescriptionFormat.SHOE_WIDTH,
+        SizeDescriptionFormat.LENGTH_WORD,
+        SizeDescriptionFormat.BARE_NUMBER,
+    }
+)
+_INSIDE_LEG_TYPES = frozenset({TROUSERS_INSEAM, INSIDE_LEG, SHORTS_INSEAM})
+_BODY_MEASUREMENTS = frozenset({CHEST, WAIST, CHEST_SIZE, WAIST_SIZE})
+_AGE_TYPE_BY_GROUP = {
+    AgeGroup.BABY: AGE_MONTHS,
+    AgeGroup.CHILD: AGE_YEARS,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -522,26 +547,34 @@ class SizeDescription:
         preferred_regions: Sequence[Locale] | None = None,
         product_type: ProductType | None = None,
         format: str | None = None,
+        age_group: AgeGroup | None = None,
     ) -> EncodedSizeDescription:
         source = _require_locale(source_region, name="source_region")
         order = self._preferred(source, preferred_regions)
         product = _require_product_type(product_type)
-        incoming = tuple(values)
-        chosen, discarded = self._choose_values(incoming, order, source)
+        if age_group is not None and not isinstance(age_group, AgeGroup):
+            raise TypeError(
+                f"age_group must be an AgeGroup, not {type(age_group).__name__}."
+            )
+        scoped = copy.copy(self)
+        scoped._age_group = age_group or AgeGroup.ADULT
+        chosen, discarded = scoped._choose_values(tuple(values), order, source)
         writers = {
-            SizeDescriptionFormat.WAIST_LEG: self._write_waist_leg,
-            SizeDescriptionFormat.WAIST_LENGTH: self._write_waist_length,
-            SizeDescriptionFormat.BRA: self._write_bra,
-            SizeDescriptionFormat.BRA_GENERIC_CUP: self._write_bra_generic_cup,
-            SizeDescriptionFormat.SHOE: self._write_shoe,
-            SizeDescriptionFormat.AGE: self._write_age,
-            SizeDescriptionFormat.PROPORTION: self._write_proportion,
-            SizeDescriptionFormat.REGIONAL_NUMBER: self._write_regional,
-            SizeDescriptionFormat.PIECES: self._write_pieces,
+            SizeDescriptionFormat.WAIST_LEG: scoped._write_waist_leg,
+            SizeDescriptionFormat.WAIST_LENGTH: scoped._write_waist_length,
+            SizeDescriptionFormat.BRA: scoped._write_bra,
+            SizeDescriptionFormat.BRA_GENERIC_CUP: scoped._write_bra_generic_cup,
+            SizeDescriptionFormat.SHOE: scoped._write_shoe,
+            SizeDescriptionFormat.AGE: scoped._write_age,
+            SizeDescriptionFormat.PROPORTION: scoped._write_proportion,
+            SizeDescriptionFormat.REGIONAL_NUMBER: scoped._write_regional,
+            SizeDescriptionFormat.PIECES: scoped._write_pieces,
         }
-        if format is not None and format not in writers:
+        if format in _DECODE_ONLY_FORMATS or (
+            format is not None and format not in writers
+        ):
             raise ValueError(f"Unknown size description format {format!r}.")
-        encoder_id = format or self._guess_format(chosen, product)
+        encoder_id = format or scoped._guess_format(chosen, product)
         if encoder_id is None or not chosen:
             return EncodedSizeDescription(
                 "",
@@ -550,7 +583,8 @@ class SizeDescription:
                 (),
                 discarded
                 + tuple(
-                    DiscardedToken(item.display(), "unrecognised") for item in chosen
+                    DiscardedToken(scoped._listing_text(item, order[0]), "unrecognised")
+                    for item in chosen
                 ),
             )
         text, used, extra = writers[encoder_id](chosen, order[0], source)
@@ -558,17 +592,23 @@ class SizeDescription:
         unused = [
             item
             for item in chosen
-            if item not in used and item.display() not in out_of_range
+            if item not in used
+            and scoped._listing_text(item, order[0]) not in out_of_range
         ]
         discarded = (
             discarded
             + extra
-            + tuple(DiscardedToken(item.display(), "unused") for item in unused)
+            + tuple(
+                DiscardedToken(scoped._listing_text(item, order[0]), "unused")
+                for item in unused
+            )
         )
+        if not text:
+            return EncodedSizeDescription("", None, 0.0, (), discarded)
         confidence = (
             1.0
             if format
-            else (0.9 if len(self._candidate_formats(chosen, product)) == 1 else 0.65)
+            else (0.9 if len(scoped._candidate_formats(chosen, product)) == 1 else 0.65)
         )
         return EncodedSizeDescription(text, encoder_id, confidence, used, discarded)
 
@@ -1406,6 +1446,8 @@ class SizeDescription:
             grouped.setdefault(size.size_type.slug, []).append(size)
         kept: list[Size] = []
         discarded: list[DiscardedToken] = []
+        shoe_type = _SHOE_BY_AGE_GROUP[self._age_group]
+        age_type = _AGE_TYPE_BY_GROUP.get(self._age_group)
         for group in grouped.values():
             if len(group) == 1:
                 chosen = group[0]
@@ -1413,6 +1455,23 @@ class SizeDescription:
             else:
                 chosen = self._prefer(group, order, source)
                 others = tuple(other for other in group if other is not chosen)
+            if (
+                chosen.size_type.family is SizeFamily.SHOE_SIZE
+                and chosen.size_type is not shoe_type
+            ):
+                discarded.append(DiscardedToken(chosen.display(), "unused"))
+                for other in others:
+                    discarded.append(DiscardedToken(other.display(), "duplicate"))
+                continue
+            if (
+                age_type is not None
+                and chosen.size_type in {AGE_MONTHS, AGE_YEARS}
+                and chosen.size_type is not age_type
+            ):
+                discarded.append(DiscardedToken(chosen.display(), "unused"))
+                for other in others:
+                    discarded.append(DiscardedToken(other.display(), "duplicate"))
+                continue
             converted = self._maybe_convert_length(chosen, order[0])
             if converted is None:
                 discarded.append(DiscardedToken(chosen.display(), "out-of-range"))
@@ -1447,7 +1506,7 @@ class SizeDescription:
             return size
         target = size_unit_for_length_unit(size.size_type, wanted)
         try:
-            return size.convert(target, demographic=_length_demographic()).size
+            return size.convert(target, demographic=self._length_demographic()).size
         except LengthOutOfRangeError:
             return None
 
@@ -1456,7 +1515,7 @@ class SizeDescription:
     ) -> tuple[SizeDescriptionFormat, ...]:
         found_types = {size.size_type for size in sizes}
         found: list[SizeDescriptionFormat] = []
-        if WAIST in found_types and TROUSERS_INSEAM in found_types:
+        if WAIST in found_types and found_types & _INSIDE_LEG_TYPES:
             found.append(SizeDescriptionFormat.WAIST_LEG)
         if WAIST in found_types and TROUSER_LENGTH in found_types:
             found.append(SizeDescriptionFormat.WAIST_LENGTH)
@@ -1468,15 +1527,20 @@ class SizeDescription:
             and _bra_generic_cup_product(product)
         ):
             found.append(SizeDescriptionFormat.BRA_GENERIC_CUP)
+        shoe_type = _SHOE_BY_AGE_GROUP[self._age_group]
         if (
             product is not None
             and product.family.reads_shoe_size
-            and (ADULT_SHOE in found_types or SHOE_WIDTH in found_types)
+            and (shoe_type in found_types or SHOE_WIDTH in found_types)
         ):
             found.append(SizeDescriptionFormat.SHOE)
         if found_types and found_types <= {AGE_MONTHS, AGE_YEARS}:
             found.append(SizeDescriptionFormat.AGE)
-        if PROPORTION in found_types and found_types <= {PROPORTION, DRESS}:
+        body = found_types & _BODY_MEASUREMENTS
+        if PROPORTION in found_types and (
+            found_types <= {PROPORTION, DRESS}
+            or (body and not (found_types & _INSIDE_LEG_TYPES))
+        ):
             found.append(SizeDescriptionFormat.PROPORTION)
         if found_types <= {DRESS} or (
             product is not None
@@ -1498,34 +1562,44 @@ class SizeDescription:
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
         waist = next(size for size in sizes if size.size_type is WAIST)
-        leg = next(size for size in sizes if size.size_type is TROUSERS_INSEAM)
-        waist_in = _as_inches(waist)
-        leg_in = _as_inches(leg)
+        leg = next(
+            size
+            for kind in (TROUSERS_INSEAM, INSIDE_LEG, SHORTS_INSEAM)
+            for size in sizes
+            if size.size_type is kind
+        )
+        waist_in = self._as_inches(waist)
+        leg_in = self._as_inches(leg)
         discarded: list[DiscardedToken] = []
         if waist_in is None:
-            discarded.append(DiscardedToken(waist.display(), "out-of-range"))
+            discarded.append(
+                DiscardedToken(self._listing_text(waist, region), "out-of-range")
+            )
         if leg_in is None:
-            discarded.append(DiscardedToken(leg.display(), "out-of-range"))
+            discarded.append(
+                DiscardedToken(self._listing_text(leg, region), "out-of-range")
+            )
         if waist_in is None or leg_in is None:
             return "", (), tuple(discarded)
-        return (
-            f"{format_raw(waist_in.raw)}/{format_raw(leg_in.raw)}",
-            (waist_in, leg_in),
-            (),
-        )
+        text = f"{format_raw(waist_in.raw)}/{format_raw(leg_in.raw)}"
+        used = [waist_in, leg_in]
+        proportion = next((size for size in sizes if size.size_type is PROPORTION), None)
+        if proportion is not None:
+            text = f"{text}{self._proportion_suffix(proportion, region)}"
+            used.append(proportion)
+        return text, tuple(used), ()
 
     def _write_waist_length(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
         waist = next(size for size in sizes if size.size_type is WAIST)
         length = next(size for size in sizes if size.size_type is TROUSER_LENGTH)
-        waist_in = _as_inches(waist)
+        waist_in = self._as_inches(waist)
         if waist_in is None:
-            return "", (), (DiscardedToken(waist.display(), "out-of-range"),)
-        vocabulary = length.size_type.vocabulary
-        code = "" if vocabulary is None else vocabulary.shorthand_for(str(length.raw))
-        if not code:
-            code = length.size_type.label_text(str(length.raw), region)
+            return "", (), (
+                DiscardedToken(self._listing_text(waist, region), "out-of-range"),
+            )
+        code = length.size_type.listing_text(str(length.raw), region)
         return f"{format_raw(waist_in.raw)}{code}", (waist_in, length), ()
 
     def _write_bra(
@@ -1562,25 +1636,43 @@ class SizeDescription:
             parts.append(shoe.display())
             used.append(shoe)
         if width is not None:
-            parts.append(width.size_type.label_text(str(width.raw), region))
+            parts.append(width.size_type.listing_text(str(width.raw), region))
             used.append(width)
         return " ".join(parts), tuple(used), ()
 
     def _write_age(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        age = next(size for size in sizes if size.size_type in {AGE_MONTHS, AGE_YEARS})
-        return age.display(), (age,), ()
+        preferred = _AGE_TYPE_BY_GROUP.get(self._age_group, AGE_YEARS)
+        age = next(
+            (size for size in sizes if size.size_type is preferred),
+            None,
+        )
+        if age is None:
+            age = next(size for size in sizes if size.size_type in {AGE_MONTHS, AGE_YEARS})
+        return self._listing_text(age, region), (age,), ()
 
     def _write_proportion(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
         proportion = next(size for size in sizes if size.size_type is PROPORTION)
         dress = next((size for size in sizes if size.size_type is DRESS), None)
-        label = proportion.size_type.label_text(str(proportion.raw), region)
-        if dress is None:
+        label = proportion.size_type.listing_text(str(proportion.raw), region)
+        if dress is not None:
+            return (
+                f"{dress.display()}{self._proportion_suffix(proportion, region)}",
+                (dress, proportion),
+                (),
+            )
+        body = next(
+            (size for size in sizes if size.size_type in _BODY_MEASUREMENTS),
+            None,
+        )
+        if body is not None and self._uses_length_short_form(proportion, region):
+            return f"{self._body_number(body)}{label}", (body, proportion), ()
+        if body is None:
             return label, (proportion,), ()
-        return f"{dress.display()} {label}", (dress, proportion), ()
+        return f"{self._listing_text(body, region)} {label}", (body, proportion), ()
 
     def _write_regional(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
@@ -1591,13 +1683,66 @@ class SizeDescription:
     def _write_pieces(
         self, sizes: tuple[Size, ...], region: Locale, source: Locale
     ) -> tuple[str, tuple[Size, ...], tuple[DiscardedToken, ...]]:
-        parts = []
-        for size in sizes:
-            if size.size_type.family is SizeFamily.LABEL:
-                parts.append(size.size_type.label_text(str(size.raw), region))
-            else:
-                parts.append(size.display())
+        parts = [self._listing_text(size, region) for size in sizes]
         return " ".join(parts), sizes, ()
+
+    def _body_number(self, size: Size) -> str:
+        if size.size_unit.length_unit and isinstance(size.raw, Decimal):
+            return format_raw(round_length_for_display(size.raw, size.size_unit.length_unit))
+        if isinstance(size.raw, Decimal):
+            return format_raw(size.raw)
+        return str(size.raw)
+
+    def _uses_length_short_form(self, size: Size, region: Locale) -> bool:
+        vocabulary = size.size_type.vocabulary
+        return (
+            vocabulary is not None
+            and region.prefers_length_short_form
+            and bool(vocabulary.shorthand_for(str(size.raw)))
+        )
+
+    def _proportion_suffix(self, proportion: Size, region: Locale) -> str:
+        label = proportion.size_type.listing_text(str(proportion.raw), region)
+        if self._uses_length_short_form(proportion, region):
+            return label
+        return f" {label}"
+
+    def _listing_text(self, size: Size, region: Locale) -> str:
+        """Listing form for one value. Region prefixes stay; inch marks do not."""
+        if size.size_type.family is SizeFamily.LABEL:
+            return size.size_type.listing_text(str(size.raw), region)
+        if size.size_unit.display_prefix and isinstance(size.raw, Decimal):
+            token = format_raw(size.raw)
+            if size.size_unit.length_unit:
+                token = format_raw(
+                    round_length_for_display(size.raw, size.size_unit.length_unit)
+                )
+            return f"{size.size_unit.display_prefix}{token}"
+        if (
+            size.size_unit.length_unit == "in"
+            and isinstance(size.raw, Decimal)
+            and uses_inch_quote()
+        ):
+            number = format_raw(round_length_for_display(size.raw, "in"))
+            mark = size.size_type.feed_mark
+            return f"{mark}{number}" if mark else number
+        return size.localised_display()
+
+    def _length_demographic(self) -> Demographic:
+        return Demographic(self._age_group, Gender.UNISEX)
+
+    def _as_inches(self, size: Size) -> Size | None:
+        if size.size_unit.length_unit == "in":
+            return size
+        if size.size_unit.length_unit == "cm":
+            try:
+                return size.convert(
+                    size_unit_for_length_unit(size.size_type, "in"),
+                    demographic=self._length_demographic(),
+                ).size
+            except LengthOutOfRangeError:
+                return None
+        return size
 
 
 def _pick_nonoverlapping(
@@ -1658,24 +1803,6 @@ def _require_product_type(value: ProductType | None) -> ProductType | None:
     return value
 
 
-def _length_demographic() -> Demographic:
-    return Demographic(AgeGroup.ADULT, Gender.UNISEX)
-
-
-def _as_inches(size: Size) -> Size | None:
-    if size.size_unit.length_unit == "in":
-        return size
-    if size.size_unit.length_unit == "cm":
-        try:
-            return size.convert(
-                size_unit_for_length_unit(size.size_type, "in"),
-                demographic=_length_demographic(),
-            ).size
-        except LengthOutOfRangeError:
-            return None
-    return size
-
-
 _SIZE_DESCRIPTIONS = SizeDescription()
 
 
@@ -1705,15 +1832,26 @@ def encode_size_description(
     preferred_regions: Sequence[Locale] | None = None,
     product_type: ProductType | None = None,
     format: str | None = None,
+    age_group: AgeGroup | None = None,
 ) -> EncodedSizeDescription:
-    """Join size values into one readable string.
+    """Join size values into one listing string.
 
     ``source_region`` is the region assumed for a size whose unit is universal.
     ``preferred_regions`` picks which regional value to keep when several
-    regions describe the same size type, and how to word label sizes. Chart
-    sizes are not converted onto a chart. Length values move between inches
-    and centimetres when the preferred region uses the other unit. An empty
-    ``preferred_regions`` reuses ``source_region``.
+    regions describe the same size type, and how to word label sizes. The
+    first region is the one the string is written for. Chart sizes are not
+    converted onto a chart. Length values move between inches and centimetres
+    when the preferred region uses the other unit, using ``age_group`` (adult
+    when omitted) for that conversion. An empty ``preferred_regions`` reuses
+    ``source_region``.
+
+    ``format`` must be a writer format. Decode-only ids are an error. Omit it
+    to guess. Confidence is ``1`` when the caller named the format, ``0.9``
+    when only one format fits, and ``0.65`` when more than one fits. An empty
+    result has no format id and confidence ``0``. Callers choose which
+    attributes become ``Size`` values; opaque catalogue text such as one-size
+    or bedding stays outside encode. The letter token ``ONE`` displays as
+    ``One size``.
     """
     return _SIZE_DESCRIPTIONS.encode(
         values,
@@ -1721,4 +1859,5 @@ def encode_size_description(
         preferred_regions=preferred_regions,
         product_type=product_type,
         format=format,
+        age_group=age_group,
     )

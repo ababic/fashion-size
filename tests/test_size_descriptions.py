@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from fashion_size.demographics import AgeGroup
+from fashion_size.demographics import AgeGroup, Demographic, Gender
 from fashion_size.descriptions import decode_size_description, encode_size_description
 from fashion_size.product_types import ProductType
 from fashion_size.types import (
@@ -15,6 +15,8 @@ from fashion_size.types import (
     DRESS,
     EU_ADULT_SHOE_SIZE,
     EU_DRESS_SIZE,
+    EU_WAIST_SIZE,
+    INCH_CHEST_SIZE,
     INCH_COLLAR_SIZE,
     INCH_INSIDE_LEG,
     INCH_SHORTS_INSEAM,
@@ -27,11 +29,13 @@ from fashion_size.types import (
     SIZE_TYPES,
     SIZE_UNITS,
     TOP_LENGTH_SIZE,
+    TROUSER_LENGTH,
     TROUSER_LENGTH_SIZE,
     UK_ADULT_SHOE_SIZE,
     UK_BAND_SIZE,
     UK_CUP_SIZE,
     UK_DRESS_SIZE,
+    UK_KIDS_SHOE_SIZE,
     US_DRESS_SIZE,
     WAIST,
     Locale,
@@ -240,7 +244,8 @@ def test_units_carry_recognition_patterns():
         preferred_regions=(Locale.FR,),
         product_type=ProductType.TROUSERS,
     )
-    assert french.text == "Normal"
+    assert french.text == "R"
+    assert TROUSER_LENGTH.label_text("regular", Locale.FR) == "Normal"
 
 
 def _ids(decoded):
@@ -673,20 +678,26 @@ def test_encode_named_formats():
 
 
 @pytest.mark.parametrize(
-    ("region", "expected"),
+    ("region", "raw", "expected"),
     [
-        (Locale.UK, "Short"),
-        (Locale.US, "Short"),
-        (Locale.FR, "Court"),
-        (Locale.EU, "Short"),
+        (Locale.UK, "short", "S"),
+        (Locale.US, "regular", "R"),
+        (Locale.EU, "long", "L"),
+        (Locale.UK, "extra-long", "XL"),
+        (Locale.UK, "extra-short", "XS"),
+        (Locale.FR, "short", "S"),
+        (Locale.FR, "regular", "R"),
+        (Locale.AU, "petite", "P"),
     ],
 )
-def test_encode_translates_length_words(region, expected):
+def test_encode_uses_regional_length_short_forms(region, raw, expected):
+    unit = PROPORTION_SIZE if raw == "petite" else TROUSER_LENGTH_SIZE
+    product = ProductType.DRESSES if raw == "petite" else ProductType.TROUSERS
     encoded = encode_size_description(
-        [Size("short", TROUSER_LENGTH_SIZE)],
+        [Size(raw, unit)],
         region,
         preferred_regions=(region,),
-        product_type=ProductType.TROUSERS,
+        product_type=product,
     )
     assert encoded.text == expected
 
@@ -1054,6 +1065,104 @@ def test_age_group_applies_to_a_prefixed_shoe():
         "EU 28", Locale.UK, product_type=ProductType.SHOES, age_group=AgeGroup.CHILD
     )
     assert _ids(decoded) == [("eu-kids-shoe-size", "28")]
+
+
+def test_encode_listing_forms():
+    waist = encode_size_description([Size(30, INCH_WAIST_SIZE)], Locale.UK)
+    assert waist.text == "W30"
+    leg = encode_size_description([Size(30, INCH_INSIDE_LEG)], Locale.UK)
+    assert leg.text == "L30"
+    regional = encode_size_description([Size(30, EU_WAIST_SIZE)], Locale.UK)
+    assert regional.text == "EU 30"
+    slash = encode_size_description(
+        [Size(76.2, CM_WAIST_SIZE), Size(81.28, CM_TROUSERS_INSEAM)],
+        Locale.EU,
+        preferred_regions=(Locale.UK,),
+        product_type=ProductType.JEANS,
+    )
+    assert slash.text == "30/32"
+    fused = encode_size_description(
+        [Size(40, INCH_CHEST_SIZE), Size("regular", PROPORTION_SIZE)],
+        Locale.UK,
+        product_type=ProductType.SHIRTS,
+    )
+    assert fused.text == "40R"
+    trailed = encode_size_description(
+        [
+            Size(30, INCH_WAIST_SIZE),
+            Size(32, INCH_TROUSERS_INSEAM),
+            Size("short", PROPORTION_SIZE),
+        ],
+        Locale.UK,
+        product_type=ProductType.JEANS,
+    )
+    assert trailed.text == "30/32S"
+    dress = encode_size_description(
+        [Size(10, UK_DRESS_SIZE), Size("regular", PROPORTION_SIZE)],
+        Locale.UK,
+        product_type=ProductType.DRESSES,
+    )
+    assert dress.text == "UK 10R"
+    petite = encode_size_description(
+        [Size(10, UK_DRESS_SIZE), Size("petite", PROPORTION_SIZE)],
+        Locale.UK,
+        product_type=ProductType.DRESSES,
+    )
+    assert petite.text == "UK 10P"
+
+
+def test_encode_letter_one_displays_as_one_size():
+    token = encode_size_description([Size("one size", LETTER_SIZE)], Locale.UK)
+    assert token.text == "One size"
+    assert token.used[0].raw == "ONE"
+
+
+def test_encode_rejects_decode_only_formats_and_follows_age_group():
+    with pytest.raises(ValueError, match="Unknown size description format"):
+        encode_size_description(
+            [Size(10, UK_DRESS_SIZE)], Locale.UK, format="unit-patterns"
+        )
+    baby = encode_size_description(
+        [Size("18", AGE_MONTHS_SIZE), Size("2", AGE_YEARS_SIZE)],
+        Locale.UK,
+        age_group=AgeGroup.BABY,
+    )
+    assert baby.text == "18 months"
+    assert any(item.reason == "unused" for item in baby.discarded)
+    adult_shoe = encode_size_description(
+        [Size(8, UK_KIDS_SHOE_SIZE)],
+        Locale.UK,
+        product_type=ProductType.SHOES,
+    )
+    assert adult_shoe.text == ""
+    assert adult_shoe.format_id is None
+    assert adult_shoe.confidence == 0.0
+    child = encode_size_description(
+        [Size(8, UK_KIDS_SHOE_SIZE)],
+        Locale.UK,
+        product_type=ProductType.SHOES,
+        age_group=AgeGroup.CHILD,
+    )
+    assert child.text == "UK 8"
+
+    seen: list[Demographic] = []
+    original = Size.convert
+
+    def record(self, unit, *, demographic, **kwargs):
+        seen.append(demographic)
+        return original(self, unit, demographic=demographic, **kwargs)
+
+    Size.convert = record
+    try:
+        encode_size_description(
+            [Size(30, INCH_WAIST_SIZE)],
+            Locale.UK,
+            preferred_regions=(Locale.EU,),
+            age_group=AgeGroup.CHILD,
+        )
+    finally:
+        Size.convert = original
+    assert seen == [Demographic(AgeGroup.CHILD, Gender.UNISEX)]
 
 
 def test_marked_length_stays_when_a_bare_number_is_declined():
