@@ -60,24 +60,26 @@ Guidance for agents working in this repository (`fashion-size`).
 
 ## 5) Development and validation commands
 
-Install dev deps:
+Install dev deps with [uv](https://docs.astral.sh/uv/) (preferred):
 
 ```bash
-pip install -e ".[testing,development]"
+uv sync
 ```
 
 Fast validation loop:
 
 ```bash
-pytest tests/test_fashion_size.py -k "<targeted-expression>"
+uv run pytest tests/test_fashion_size.py -k "<targeted-expression>"
 ```
 
 Full local gate (matches CI intent):
 
 ```bash
-pytest tests/test_fashion_size.py
-ruff check src tests
+uv run pytest tests/test_fashion_size.py
+uv run ruff check src tests
 ```
+
+CI still uses `pip install -e ".[testing]"` on Python 3.12–3.14. Regenerate and commit `uv.lock` after changing `[dependency-groups]` or optional dev deps.
 
 CI runs:
 
