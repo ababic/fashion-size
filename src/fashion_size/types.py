@@ -78,11 +78,24 @@ class Locale(StrEnum):
     AU = "au"
     FR = "fr"
 
+    @property
+    def prefers_length_short_form(self) -> bool:
+        """Whether listing text uses length letters such as ``S`` / ``R`` / ``L``.
+
+        UK, US, AU, EU, and FR retail all fuse those Latin letters onto a size
+        (``32R``, ``40L``, ``UK 10P``). Regional words such as French ``Court``
+        stay available from ``label_text`` when a full word is wanted.
+        """
+        return self in _LENGTH_SHORT_FORM_LOCALES
+
 
 # Chart columns. French is not a column: dress, shoe, and cup sizes use the EU size.
 # French band size is the EU centimetre label plus this offset (EU 75 = FR 90).
 CHART_LOCALES: tuple[Locale, ...] = (Locale.UK, Locale.EU, Locale.US, Locale.AU)
 FRENCH_BAND_OFFSET = Decimal(15)
+_LENGTH_SHORT_FORM_LOCALES = frozenset(
+    {Locale.UK, Locale.EU, Locale.US, Locale.AU, Locale.FR}
+)
 
 
 class IncompatibleSizeError(ValueError):
@@ -450,9 +463,10 @@ class LabelVocabulary:
     can be hashed. ``display`` maps a canonical token to English. ``aliases``
     maps a folded synonym (case and hyphens folded) onto that token.
     ``regional`` replaces the English word for one locale. ``shorthand`` is
-    the short letter used in a compound such as ``30L``. ``patterns`` are
-    recognition expressions, each with a ``value`` group. ``age_unit`` is
-    ``months`` or ``years`` when the token is an age band rather than a word.
+    the short letter used in a listing such as ``30L`` or ``UK 10P``.
+    ``patterns`` are recognition expressions, each with a ``value`` group.
+    ``age_unit`` is ``months`` or ``years`` when the token is an age band
+    rather than a word.
     """
 
     display: tuple[tuple[str, str], ...] = ()
@@ -477,7 +491,7 @@ class LabelVocabulary:
         raise ValueError(raw)
 
     def text(self, token: str, locale: Locale | None = None) -> str:
-        """Word for ``token``, using ``locale`` when this vocabulary has one."""
+        """Full word for ``token``, using ``locale`` when this vocabulary has one."""
         if self.age_unit:
             return self._age_text(token)
         if locale is not None:
@@ -489,6 +503,21 @@ class LabelVocabulary:
         except KeyError as exc:
             raise ValueError(token) from exc
 
+    def listing_text(self, token: str, locale: Locale | None = None) -> str:
+        """Listing form for ``token``.
+
+        Regions that prefer length short form get the shorthand letter when one
+        exists (``S``, ``R``, ``L``, ``XL``, ``XS``, ``P``). Otherwise this is
+        the same as ``text``.
+        """
+        if (
+            locale is not None
+            and locale.prefers_length_short_form
+            and (short := self.shorthand_for(token))
+        ):
+            return short
+        return self.text(token, locale)
+
     def regional_words(self, token: str) -> tuple[tuple[Locale, str], ...]:
         for name, words in self.regional:
             if name == token:
@@ -496,7 +525,7 @@ class LabelVocabulary:
         return ()
 
     def shorthand_for(self, token: str) -> str:
-        """Short letter for a compound such as ``30L``, or ``""``."""
+        """Short letter for a listing such as ``30L``, or ``""``."""
         return dict(self.shorthand).get(token, "")
 
     def _age_token(self, text: str) -> str:
@@ -693,11 +722,20 @@ class SizeType:
             raise ValueError(f"Unknown {self.label} value {raw!r}.") from exc
 
     def label_text(self, token: str, locale: Locale | None = None) -> str:
-        """English label, or the regional word when ``locale`` has one."""
+        """Full word for ``token``, or the regional word when ``locale`` has one."""
         if self.vocabulary is None:
             raise ValueError(f"{self.label} is not a label size type.")
         try:
             return self.vocabulary.text(token, locale)
+        except ValueError as exc:
+            raise ValueError(f"Unknown {self.label} token {token!r}.") from exc
+
+    def listing_text(self, token: str, locale: Locale | None = None) -> str:
+        """Listing form for ``token``, including length short form when the region uses it."""
+        if self.vocabulary is None:
+            raise ValueError(f"{self.label} is not a label size type.")
+        try:
+            return self.vocabulary.listing_text(token, locale)
         except ValueError as exc:
             raise ValueError(f"Unknown {self.label} token {token!r}.") from exc
 
@@ -885,6 +923,7 @@ _LENGTH_REGIONAL = {
     "extra-short": {Locale.FR: "Très court"},
     "short": {Locale.FR: "Court"},
     "regular": {Locale.FR: "Normal"},
+    "long": {Locale.FR: "Long"},
     "extra-long": {Locale.FR: "Très long"},
 }
 TROUSER_LENGTH_VOCABULARY = label_vocabulary(
@@ -937,6 +976,13 @@ TOP_LENGTH_VOCABULARY = label_vocabulary(
         "xl": "extra-long",
     },
     regional=_LENGTH_REGIONAL,
+    shorthand={
+        "extra-short": "XS",
+        "short": "S",
+        "regular": "R",
+        "long": "L",
+        "extra-long": "XL",
+    },
     patterns=(rf"(?<![A-Za-z])(?P<value>{_LENGTH_WORDS})(?![A-Za-z])",),
 )
 SHOE_WIDTH_VOCABULARY = label_vocabulary(
@@ -1004,6 +1050,12 @@ PROPORTION_VOCABULARY = label_vocabulary(
     regional={
         "extra-tall": {Locale.FR: "Très grand"},
         "tall": {Locale.FR: "Grand"},
+    },
+    shorthand={
+        "petite": "P",
+        "short": "S",
+        "regular": "R",
+        "long": "L",
     },
     patterns=(r"(?<![A-Za-z])(?P<value>extra\s+tall|tall|petite|pt)(?![A-Za-z])",),
 )
