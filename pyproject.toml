@@ -45,6 +45,15 @@ development = [
     "ruff>=0.11,<1",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.11,<1",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
 [project.urls]
 Repository = "https://github.com/ababic/fashion-size"
 Changelog = "https://github.com/ababic/fashion-size/blob/main/CHANGELOG.md"
