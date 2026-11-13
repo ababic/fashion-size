@@ -50,11 +50,13 @@ from fashion_size.scales import (
 )
 from fashion_size.size_types import SizeTypeSlug
 from fashion_size.types import (
+    ATTRIBUTE_SIZE_TYPES,
     AU_BAND_SIZE,
     AU_CHEST_SIZE,
     AU_WAIST_SIZE,
     CHEST,
     CM_CHEST_SIZE,
+    CM_HEM_LENGTH,
     COLLAR,
     EU_ADULT_SHOE_SIZE,
     EU_BAND_SIZE,
@@ -64,7 +66,9 @@ from fashion_size.types import (
     EU_WAIST_SIZE,
     FR_BAND_SIZE,
     GARMENT_INSEAM_SIZE_TYPES,
+    HEM_LENGTH,
     INCH_CHEST_SIZE,
+    INCH_HEM_LENGTH,
     INCH_SHORTS_INSEAM,
     INCH_TROUSERS_INSEAM,
     INSIDE_LEG,
@@ -99,7 +103,7 @@ from fashion_size.types import (
 
 
 def test_version_is_the_current_release():
-    assert __version__ == "2026.11.13"
+    assert __version__ == "2026.11.13.1"
 
 
 def test_readme_brand_chart_example():
@@ -507,18 +511,48 @@ def test_garment_inseam_length_bounds():
             "cm", demographic=demographic
         )
 
+    assert (
+        Size.from_raw(32, INCH_HEM_LENGTH)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("81.28")
+    )
+    assert (
+        Size.from_raw(20, INCH_HEM_LENGTH)
+        .convert("cm", demographic=demographic)
+        .raw
+        == Decimal("50.8")
+    )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("19.9"), INCH_HEM_LENGTH).convert(
+            "cm", demographic=demographic
+        )
+    with pytest.raises(LengthOutOfRangeError):
+        Size.from_raw(Decimal("42.1"), INCH_HEM_LENGTH).convert(
+            "cm", demographic=demographic
+        )
+
     shorts = size_from_attribute_option("in-shorts-inseam", '5"')
     assert shorts is not None and shorts.size_unit is INCH_SHORTS_INSEAM
     trousers = size_from_attribute_option("cm-trousers-inseam", "81cm")
     assert trousers is not None and trousers.raw == Decimal("81")
     assert size_from_attribute_option("in-shorts-inseam", '30"') is None
+    hem = size_from_attribute_option("in-hem-length", '34"')
+    assert hem is not None and hem.size_unit is INCH_HEM_LENGTH
+    centimetre_hem = size_from_attribute_option("cm-hem-length", "86cm")
+    assert centimetre_hem is not None and centimetre_hem.size_unit is CM_HEM_LENGTH
+    assert ATTRIBUTE_SIZE_TYPES["hem-length"] is HEM_LENGTH
+    assert ATTRIBUTE_SIZE_TYPES["dress-length"] is HEM_LENGTH
 
     assert SHORTS_INSEAM.length_range_start == Decimal("2")
     assert SHORTS_INSEAM.length_range_stop == Decimal("24")
     assert TROUSERS_INSEAM.length_range_start == Decimal("17")
     assert TROUSERS_INSEAM.length_range_stop == Decimal("42")
+    assert HEM_LENGTH.length_range_start == Decimal("20")
+    assert HEM_LENGTH.length_range_stop == Decimal("42")
     assert SHORTS_INSEAM.length_range is not None
     assert INCH_SHORTS_INSEAM.length_range == SHORTS_INSEAM.length_range
+    assert INCH_HEM_LENGTH.length_range == HEM_LENGTH.length_range
     assert INSIDE_LEG.length_range_start == Decimal("2")
     assert INSIDE_LEG.length_range_stop == Decimal("42")
     assert CHEST.length_range_start == Decimal("18")

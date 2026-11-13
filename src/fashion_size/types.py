@@ -507,7 +507,7 @@ class LabelVocabulary:
         """Listing form for ``token``.
 
         Regions that prefer length short form get the shorthand letter when one
-        exists (``S``, ``R``, ``L``, ``XL``, ``XS``, ``P``). Otherwise this is
+        exists (``S``, ``M``, ``R``, ``L``, ``XL``, ``XS``, ``P``). Otherwise this is
         the same as ``text``.
         """
         if (
@@ -889,6 +889,17 @@ TROUSERS_INSEAM = SizeType(
     affinity=_affinity(ProductTypeFamily.BOTTOMS),
     feed_mark="L",
 )
+# Fitted-dress hem (tape measure). Observed values start at 20 in (no sub-20
+# hems seen); upper bound matches trousers inseam. Keep the types distinct.
+HEM_LENGTH = SizeType(
+    SizeTypeSlug.HEM_LENGTH,
+    SizeFamily.LENGTH,
+    "Hem length",
+    ("hem-length", "dress-length"),
+    length_min_inches=Decimal("20"),
+    length_max_inches=Decimal("42"),
+    affinity=_affinity(ProductTypeFamily.DRESSES),
+)
 COLLAR = SizeType(
     SizeTypeSlug.COLLAR,
     SizeFamily.LENGTH,
@@ -911,10 +922,16 @@ SLEEVE = SizeType(
 # Sold-as words. ``raw`` is a canonical token (``regular``, ``extra-wide``).
 # They do not sit on locale charts. Each vocabulary owns the synonyms and
 # the regional wording.
-_LENGTH_WORDS = r"extra\s+short|extra\s+long|short|long|regular|standard"
+# ``mid`` is its own stored token (listing ``M``). Bare ``m`` is only an alias
+# when the size unit is known — word recognition keeps ``mid`` so a lone ``M``
+# on a top stays letter Medium.
+_LENGTH_WORDS = (
+    r"extra\s+short|extra\s+long|mid(?:\s*-?\s*length)?|short|long|regular|standard"
+)
 _LENGTH_DISPLAY = {
     "extra-short": "Extra short",
     "short": "Short",
+    "mid": "Mid",
     "regular": "Regular",
     "long": "Long",
     "extra-long": "Extra long",
@@ -922,69 +939,65 @@ _LENGTH_DISPLAY = {
 _LENGTH_REGIONAL = {
     "extra-short": {Locale.FR: "Très court"},
     "short": {Locale.FR: "Court"},
+    "mid": {Locale.FR: "Mi-long"},
     "regular": {Locale.FR: "Normal"},
     "long": {Locale.FR: "Long"},
     "extra-long": {Locale.FR: "Très long"},
 }
+_LENGTH_ALIASES = {
+    "xs": "extra-short",
+    "xshort": "extra-short",
+    "extra short": "extra-short",
+    "extrashort": "extra-short",
+    "s": "short",
+    "short": "short",
+    "m": "mid",
+    "mid": "mid",
+    "mid length": "mid",
+    "midlength": "mid",
+    "r": "regular",
+    "reg": "regular",
+    "regular": "regular",
+    "standard": "regular",
+    "std": "regular",
+    "l": "long",
+    "long": "long",
+    "xl": "extra-long",
+    "xlong": "extra-long",
+    "extra long": "extra-long",
+    "extralong": "extra-long",
+}
+_LENGTH_SHORTHAND = {
+    "extra-short": "XS",
+    "short": "S",
+    "mid": "M",
+    "regular": "R",
+    "long": "L",
+    "extra-long": "XL",
+}
 TROUSER_LENGTH_VOCABULARY = label_vocabulary(
     display=_LENGTH_DISPLAY,
-    aliases={
-        "xs": "extra-short",
-        "xshort": "extra-short",
-        "extra short": "extra-short",
-        "extrashort": "extra-short",
-        "s": "short",
-        "short": "short",
-        "r": "regular",
-        "reg": "regular",
-        "regular": "regular",
-        "standard": "regular",
-        "std": "regular",
-        "l": "long",
-        "long": "long",
-        "xl": "extra-long",
-        "xlong": "extra-long",
-        "extra long": "extra-long",
-        "extralong": "extra-long",
-    },
+    aliases=_LENGTH_ALIASES,
     regional=_LENGTH_REGIONAL,
-    shorthand={
-        "extra-short": "XS",
-        "short": "S",
-        "regular": "R",
-        "long": "L",
-        "extra-long": "XL",
-    },
+    shorthand=_LENGTH_SHORTHAND,
     patterns=(
         rf"(?<![A-Za-z])(?P<value>{_LENGTH_WORDS})(?![A-Za-z])",
+        # Trailing ``M`` is not here: adult bottoms read ``30M`` as Mid in
+        # waist-length, while child/baby ``6m`` stays months.
         r"(?<=\d)\s*(?P<value>[SRL])(?![A-Za-z])",
     ),
 )
 TOP_LENGTH_VOCABULARY = label_vocabulary(
     display=_LENGTH_DISPLAY,
-    aliases={
-        "xs": "extra-short",
-        "extra short": "extra-short",
-        "short": "short",
-        "s": "short",
-        "regular": "regular",
-        "reg": "regular",
-        "standard": "regular",
-        "long": "long",
-        "l": "long",
-        "extra long": "extra-long",
-        "xl": "extra-long",
-    },
+    aliases=_LENGTH_ALIASES,
     regional=_LENGTH_REGIONAL,
-    shorthand={
-        "extra-short": "XS",
-        "short": "S",
-        "regular": "R",
-        "long": "L",
-        "extra-long": "XL",
-    },
+    shorthand=_LENGTH_SHORTHAND,
     patterns=(rf"(?<![A-Za-z])(?P<value>{_LENGTH_WORDS})(?![A-Za-z])",),
 )
+# Same sold-as words as top length; skirts / coats reuse the words but not the
+# top-length size type.
+SKIRT_LENGTH_VOCABULARY = TOP_LENGTH_VOCABULARY
+JACKET_LENGTH_VOCABULARY = TOP_LENGTH_VOCABULARY
 SHOE_WIDTH_VOCABULARY = label_vocabulary(
     display={
         "narrow": "Narrow",
@@ -1146,8 +1159,26 @@ TOP_LENGTH = SizeType(
     SizeFamily.LABEL,
     "Top length",
     ("top-length",),
-    affinity=_affinity(ProductTypeFamily.TOPS),
+    # Outerwear uses jacket-length instead.
+    affinity=frozenset(ProductTypeFamily.TOPS.product_types)
+    - {ProductType.OUTERWEAR},
     vocabulary=TOP_LENGTH_VOCABULARY,
+)
+SKIRT_LENGTH = SizeType(
+    SizeTypeSlug.SKIRT_LENGTH,
+    SizeFamily.LABEL,
+    "Skirt length",
+    ("skirt-length",),
+    affinity=_affinity(ProductTypeFamily.DRESSES),
+    vocabulary=SKIRT_LENGTH_VOCABULARY,
+)
+JACKET_LENGTH = SizeType(
+    SizeTypeSlug.JACKET_LENGTH,
+    SizeFamily.LABEL,
+    "Jacket length",
+    ("jacket-length", "coat-length"),
+    affinity=frozenset({ProductType.OUTERWEAR}),
+    vocabulary=JACKET_LENGTH_VOCABULARY,
 )
 SHOE_WIDTH = SizeType(
     SizeTypeSlug.SHOE_WIDTH,
@@ -1204,10 +1235,13 @@ SIZE_TYPES: tuple[SizeType, ...] = (
     INSIDE_LEG,
     SHORTS_INSEAM,
     TROUSERS_INSEAM,
+    HEM_LENGTH,
     COLLAR,
     SLEEVE,
     TROUSER_LENGTH,
     TOP_LENGTH,
+    SKIRT_LENGTH,
+    JACKET_LENGTH,
     SHOE_WIDTH,
     PROPORTION,
     AGE_MONTHS,
@@ -1578,6 +1612,12 @@ INCH_TROUSERS_INSEAM = _length_size_unit(
 CM_TROUSERS_INSEAM = _length_size_unit(
     TROUSERS_INSEAM, unit="cm", display_suffix="cm", label_unit="centimetres"
 )
+INCH_HEM_LENGTH = _length_size_unit(
+    HEM_LENGTH, unit="in", display_suffix='"', label_unit="inches"
+)
+CM_HEM_LENGTH = _length_size_unit(
+    HEM_LENGTH, unit="cm", display_suffix="cm", label_unit="centimetres"
+)
 INCH_COLLAR_SIZE = _length_size_unit(
     COLLAR, unit="in", display_suffix='"', label_unit="inches"
 )
@@ -1606,6 +1646,8 @@ def _label_size_unit(size_type: SizeType) -> SizeUnit:
 
 TROUSER_LENGTH_SIZE = _label_size_unit(TROUSER_LENGTH)
 TOP_LENGTH_SIZE = _label_size_unit(TOP_LENGTH)
+SKIRT_LENGTH_SIZE = _label_size_unit(SKIRT_LENGTH)
+JACKET_LENGTH_SIZE = _label_size_unit(JACKET_LENGTH)
 SHOE_WIDTH_SIZE = _label_size_unit(SHOE_WIDTH)
 PROPORTION_SIZE = _label_size_unit(PROPORTION)
 AGE_MONTHS_SIZE = _label_size_unit(AGE_MONTHS)
@@ -1667,12 +1709,16 @@ SIZE_UNITS: tuple[SizeUnit, ...] = (
     CM_SHORTS_INSEAM,
     INCH_TROUSERS_INSEAM,
     CM_TROUSERS_INSEAM,
+    INCH_HEM_LENGTH,
+    CM_HEM_LENGTH,
     INCH_COLLAR_SIZE,
     CM_COLLAR_SIZE,
     INCH_SLEEVE_SIZE,
     CM_SLEEVE_SIZE,
     TROUSER_LENGTH_SIZE,
     TOP_LENGTH_SIZE,
+    SKIRT_LENGTH_SIZE,
+    JACKET_LENGTH_SIZE,
     SHOE_WIDTH_SIZE,
     PROPORTION_SIZE,
     AGE_MONTHS_SIZE,

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2026.11.13.1
+
+- `hem-length` formula length size type for fitted-dress hem measurements (`in-hem-length` / `cm-hem-length`, attribute slug `dress-length` also resolves). Bounds 20–42 in; distinct from `trousers-inseam` for the dresses family.
+- `skirt-length` label size type for skirt (and dress-family) sold-as length words. Shares the top/trouser length vocabulary (`short` / `mid` / `regular` / …) but is a distinct type so feeds no longer reuse `top-length`.
+- `jacket-length` label size type for coat/jacket length on outerwear (attribute slug `coat-length` also resolves). Same length vocabulary as top length; affinity is outerwear only so shirts and knitwear keep `top-length`.
+- `encode_size_description` keeps dress + skirt length (`UK 10M`), dress + hem (`UK 10 34`), and chest + jacket length (`40L`) instead of dropping the secondary size on the regional dress writer.
+- `encode_size_description(..., include_region_prefix=False)` omits chart region prefixes in the listing (`10M` instead of `UK 10M`). Default remains `True`.
+- Top and trouser length accept `mid` as its own token (aliases `M`, `Mid`, `mid-length`), with listing short form `M`. Decode understands `Mid` / `mid-length` and adult bottoms waist codes such as `30M`; a bare `M` on a top remains letter Medium. Child/baby `age_group` prefers months for trailing `M` / `6m` over Mid. French label text is `Mi-long`.
 - Local development and CI use [uv](https://docs.astral.sh/uv/): `uv sync` / `uv sync --locked`, then `uv run pytest` / `uv run ruff`. Committed `uv.lock` and `.python-version` (3.12). GitHub Actions builds wheels with `uv build`. Optional `pip install -e ".[testing,development]"` still works locally.
 
 ## 2026.11.13

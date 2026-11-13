@@ -18,16 +18,19 @@ from fashion_size.types import (
     EU_WAIST_SIZE,
     INCH_CHEST_SIZE,
     INCH_COLLAR_SIZE,
+    INCH_HEM_LENGTH,
     INCH_INSIDE_LEG,
     INCH_SHORTS_INSEAM,
     INCH_TROUSERS_INSEAM,
     INCH_WAIST_SIZE,
+    JACKET_LENGTH_SIZE,
     LETTER,
     LETTER_SIZE,
     PROPORTION_SIZE,
     SHOE_WIDTH_SIZE,
     SIZE_TYPES,
     SIZE_UNITS,
+    SKIRT_LENGTH_SIZE,
     TOP_LENGTH_SIZE,
     TROUSER_LENGTH,
     TROUSER_LENGTH_SIZE,
@@ -59,6 +62,31 @@ def test_waist_leg_and_length_code():
     assert length.format_id == "waist-length"
     assert length.sizes[1].raw == "long"
     assert encode_size_description(length.sizes, Locale.UK).text == "30L"
+
+    mid = decode_size_description(
+        "30M", Locale.UK, product_type=ProductType.TROUSERS
+    )
+    assert mid.format_id == "waist-length"
+    assert mid.sizes[1].raw == "mid"
+    assert encode_size_description(mid.sizes, Locale.UK).text == "30M"
+
+    baby_months = decode_size_description(
+        "6m",
+        Locale.UK,
+        product_type=ProductType.TROUSERS,
+        age_group=AgeGroup.BABY,
+    )
+    assert baby_months.format_id == "age"
+    assert baby_months.sizes[0].raw == "6"
+
+    child_months = decode_size_description(
+        "30M",
+        Locale.UK,
+        product_type=ProductType.TROUSERS,
+        age_group=AgeGroup.CHILD,
+    )
+    assert child_months.format_id == "age"
+    assert child_months.sizes[0].size_unit.slug == "age-months"
 
 
 def test_bra_age_proportion_and_shoe_width():
@@ -246,6 +274,7 @@ def test_units_carry_recognition_patterns():
     )
     assert french.text == "R"
     assert TROUSER_LENGTH.label_text("regular", Locale.FR) == "Normal"
+    assert TROUSER_LENGTH.label_text("mid", Locale.FR) == "Mi-long"
 
 
 def _ids(decoded):
@@ -425,11 +454,21 @@ def test_age_bands(raw, slug, token, display):
         ("Regular", ProductType.TROUSERS, "trouser-length", "regular"),
         ("standard", ProductType.JEANS, "trouser-length", "regular"),
         ("Short", ProductType.TROUSERS, "trouser-length", "short"),
+        ("Mid", ProductType.TROUSERS, "trouser-length", "mid"),
+        ("mid-length", ProductType.JEANS, "trouser-length", "mid"),
         ("Extra short", ProductType.TROUSERS, "trouser-length", "extra-short"),
         ("Extra long", ProductType.JEANS, "trouser-length", "extra-long"),
         ("Regular", ProductType.SHIRTS, "top-length", "regular"),
+        ("Mid", ProductType.SHIRTS, "top-length", "mid"),
         ("Long", ProductType.KNITWEAR, "top-length", "long"),
         ("Extra short", ProductType.CASUAL_TOPS, "top-length", "extra-short"),
+        ("Mid", ProductType.SKIRTS, "skirt-length", "mid"),
+        ("mid-length", ProductType.SKIRTS, "skirt-length", "mid"),
+        ("Regular", ProductType.SKIRTS, "skirt-length", "regular"),
+        ("Extra long", ProductType.DRESSES, "skirt-length", "extra-long"),
+        ("Mid", ProductType.OUTERWEAR, "jacket-length", "mid"),
+        ("Long", ProductType.OUTERWEAR, "jacket-length", "long"),
+        ("Extra short", ProductType.OUTERWEAR, "jacket-length", "extra-short"),
     ],
 )
 def test_proportion_and_length_words(raw, product, slug, token):
@@ -513,9 +552,18 @@ def test_ambiguous_string_lowers_confidence_and_lists_alternatives():
 def test_label_synonyms_round_trip_through_size():
     assert Size("R", TROUSER_LENGTH_SIZE).raw == "regular"
     assert Size("std", TROUSER_LENGTH_SIZE).raw == "regular"
+    assert Size("M", TROUSER_LENGTH_SIZE).raw == "mid"
+    assert Size("Mid", TROUSER_LENGTH_SIZE).raw == "mid"
+    assert Size("mid-length", TOP_LENGTH_SIZE).raw == "mid"
+    assert Size("M", SKIRT_LENGTH_SIZE).raw == "mid"
+    assert Size("M", JACKET_LENGTH_SIZE).raw == "mid"
     assert Size("extra-short", TROUSER_LENGTH_SIZE).raw == "extra-short"
     assert Size("XL", TROUSER_LENGTH_SIZE).display() == "Extra long"
+    assert Size("mid", TOP_LENGTH_SIZE).display() == "Mid"
+    assert Size("mid", SKIRT_LENGTH_SIZE).display() == "Mid"
+    assert Size("mid", JACKET_LENGTH_SIZE).display() == "Mid"
     assert Size("extra long", TOP_LENGTH_SIZE).raw == "extra-long"
+    assert Size("extra long", JACKET_LENGTH_SIZE).raw == "extra-long"
     assert Size("G", SHOE_WIDTH_SIZE).raw == "wide"
     assert Size("medium", SHOE_WIDTH_SIZE).raw == "standard"
     assert Size("pt", PROPORTION_SIZE).raw == "petite"
@@ -681,11 +729,13 @@ def test_encode_named_formats():
     ("region", "raw", "expected"),
     [
         (Locale.UK, "short", "S"),
+        (Locale.UK, "mid", "M"),
         (Locale.US, "regular", "R"),
         (Locale.EU, "long", "L"),
         (Locale.UK, "extra-long", "XL"),
         (Locale.UK, "extra-short", "XS"),
         (Locale.FR, "short", "S"),
+        (Locale.FR, "mid", "M"),
         (Locale.FR, "regular", "R"),
         (Locale.AU, "petite", "P"),
     ],
@@ -1109,6 +1159,77 @@ def test_encode_listing_forms():
         product_type=ProductType.DRESSES,
     )
     assert petite.text == "UK 10P"
+    skirt = encode_size_description(
+        [Size(10, UK_DRESS_SIZE), Size("mid", SKIRT_LENGTH_SIZE)],
+        Locale.UK,
+        product_type=ProductType.SKIRTS,
+    )
+    assert skirt.format_id == "skirt-length"
+    assert skirt.text == "UK 10M"
+    assert [size.size_unit.slug for size in skirt.used] == [
+        "uk-dress-size",
+        "skirt-length",
+    ]
+    hem = encode_size_description(
+        [Size(10, UK_DRESS_SIZE), Size(34, INCH_HEM_LENGTH)],
+        Locale.UK,
+        product_type=ProductType.DRESSES,
+    )
+    assert hem.format_id == "hem-length"
+    assert hem.text == "UK 10 34"
+    assert [size.size_unit.slug for size in hem.used] == [
+        "uk-dress-size",
+        "in-hem-length",
+    ]
+    jacket = encode_size_description(
+        [Size(40, INCH_CHEST_SIZE), Size("long", JACKET_LENGTH_SIZE)],
+        Locale.UK,
+        product_type=ProductType.OUTERWEAR,
+    )
+    assert jacket.format_id == "jacket-length"
+    assert jacket.text == "40L"
+    assert encode_size_description(
+        [Size("mid", JACKET_LENGTH_SIZE)],
+        Locale.UK,
+        product_type=ProductType.OUTERWEAR,
+    ).text == "M"
+
+
+def test_encode_can_omit_region_prefix():
+    dress = encode_size_description(
+        [Size(10, UK_DRESS_SIZE), Size("mid", SKIRT_LENGTH_SIZE)],
+        Locale.UK,
+        product_type=ProductType.SKIRTS,
+        include_region_prefix=False,
+    )
+    assert dress.text == "10M"
+    hem = encode_size_description(
+        [Size(10, UK_DRESS_SIZE), Size(34, INCH_HEM_LENGTH)],
+        Locale.UK,
+        product_type=ProductType.DRESSES,
+        include_region_prefix=False,
+    )
+    assert hem.text == "10 34"
+    shoe = encode_size_description(
+        [Size(6, UK_ADULT_SHOE_SIZE), Size("wide", SHOE_WIDTH_SIZE)],
+        Locale.UK,
+        product_type=ProductType.SHOES,
+        include_region_prefix=False,
+    )
+    assert shoe.text == "6 Wide"
+    kept = encode_size_description(
+        [Size(10, UK_DRESS_SIZE)],
+        Locale.UK,
+        product_type=ProductType.DRESSES,
+    )
+    assert kept.text == "UK 10"
+    foreign = encode_size_description(
+        [Size(38, EU_DRESS_SIZE)],
+        Locale.UK,
+        product_type=ProductType.DRESSES,
+        include_region_prefix=False,
+    )
+    assert foreign.text == "38"
 
 
 def test_encode_letter_one_displays_as_one_size():
